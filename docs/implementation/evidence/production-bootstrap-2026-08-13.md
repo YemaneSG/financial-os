@@ -59,6 +59,7 @@ failure/review state.
 | 2026-08-13 | Verified live API 200/200 health, 404 production docs, 401 unauthenticated receipts, 404 direct worker, 100% API traffic, restored migration runner, and complete hosting headers. | Pass |
 | 2026-08-13 | Verified authenticated owner history query against the deployed API and Cloud SQL; clean first-run result contained zero receipts. | Pass |
 | 2026-08-13 | Final Terraform convergence plan. | Pass — no changes |
+| 2026-08-13 | Corrected Firebase root caching after an iPhone received the pre-release placeholder. Both hosting domains now return Financial OS with `no-cache, no-store, must-revalidate`; security headers were revalidated. | Pass |
 
 ## Owner Gate C checklist
 
