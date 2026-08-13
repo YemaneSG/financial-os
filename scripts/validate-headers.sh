@@ -10,7 +10,7 @@ URL="${URL%/}" # Strip trailing slash.
 TARGET="${URL}/index.html"
 
 echo "Fetching headers from: ${TARGET}"
-HEADERS=$(curl -sI --max-time 15 "${TARGET}")
+HEADERS=$(curl -sIL --max-time 15 "${TARGET}" | sed -n '/^HTTP\//,$p')
 
 ERRORS=0
 
@@ -18,12 +18,27 @@ assert_header() {
   local header_name="$1"
   local expected_pattern="$2"
   local actual
-  actual=$(echo "$HEADERS" | grep -i "^${header_name}:" | head -1 | sed 's/^[^:]*: *//')
+  actual=$(echo "$HEADERS" | grep -i "^${header_name}:" | tail -1 | sed 's/^[^:]*: *//')
   if echo "$actual" | grep -qE "$expected_pattern"; then
     echo "PASS: ${header_name}"
   else
     echo "FAIL: ${header_name}"
     echo "      expected to match: ${expected_pattern}"
+    echo "      got: ${actual}"
+    ERRORS=$((ERRORS + 1))
+  fi
+}
+
+assert_hsts_min_age() {
+  local actual
+  local max_age
+  actual=$(echo "$HEADERS" | grep -i "^strict-transport-security:" | tail -1 | sed 's/^[^:]*: *//')
+  max_age=$(echo "$actual" | sed -nE 's/.*max-age=([0-9]+).*/\1/ip')
+  if [[ -n "$max_age" ]] && (( 10#$max_age >= 31536000 )); then
+    echo "PASS: strict-transport-security max-age"
+  else
+    echo "FAIL: strict-transport-security max-age"
+    echo "      expected at least 31536000 seconds"
     echo "      got: ${actual}"
     ERRORS=$((ERRORS + 1))
   fi
@@ -51,7 +66,9 @@ assert_absent  "content-security-policy" "unsafe-inline"
 assert_absent  "content-security-policy" "unsafe-eval"
 
 # ── Additional required headers (APP-03, NET-01) ─────────────────────────
-assert_header "strict-transport-security" "max-age=63072000"
+assert_hsts_min_age
+assert_header "strict-transport-security" "includeSubDomains"
+assert_header "strict-transport-security" "preload"
 assert_header "x-content-type-options"    "nosniff"
 assert_header "referrer-policy"           "no-referrer"
 assert_header "permissions-policy"        "camera=\(self\)"

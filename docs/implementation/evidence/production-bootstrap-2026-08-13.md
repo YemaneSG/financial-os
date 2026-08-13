@@ -1,6 +1,6 @@
 # Production bootstrap evidence — August 13, 2026
 
-**Status:** Cloud deployment complete; owner iPhone acceptance pending
+**Status:** Cloud deployment complete; core owner iPhone capture accepted
 **Environment:** Personally controlled GCP project; private identifiers intentionally omitted
 
 ## Session objective
@@ -41,9 +41,11 @@ failure/review state.
   a live browser-to-API-to-Cloud-SQL receipt-list round trip.
 - **Pass:** Cloud SQL automated backups/PITR and evidence-bucket versioning,
   soft-delete, uniform access, and public-access prevention are enabled.
-- **Pending Gate C:** Use a non-sensitive test receipt on the owner's real iPhone
-  to verify Home Screen install, persistent auth, camera, library fallback,
-  signed upload, durable acknowledgement, history/detail, Wi-Fi, and cellular.
+- **Pass — Gate C core path:** The owner used real iPhone Safari camera capture,
+  signed upload, durable acknowledgement, history/detail, extraction, and
+  authenticated image loading successfully over Wi-Fi.
+- **Pending Gate C remainder:** Verify Home Screen installation, installed-app
+  session persistence, library fallback, and a cellular submission.
 - **Pending Sprint 2 operations:** Execute and time the documented restore drill.
 
 ## Activity log
@@ -62,6 +64,9 @@ failure/review state.
 | 2026-08-13 | Corrected Firebase root caching after an iPhone received the pre-release placeholder. Both hosting domains now return Financial OS with `no-cache, no-store, must-revalidate`; security headers were revalidated. | Pass |
 | 2026-08-13 | Diagnosed the first live HEIC attempt: the browser omitted `File.type`, creating a signed-header mismatch, and the `firebaseapp.com` alias was absent from bucket CORS. Deployed extension-based allowlisted MIME inference, exact signed/upload header matching, magic-byte MIME recording, a truthful HEIC preview fallback, retry-state clearing, and both exact Firebase origins. | Pass — 83 PWA tests, 84 backend tests, and live CORS preflights from both origins |
 | 2026-08-13 | Reproduced an endless Google sign-in spinner on Safari and Chrome when the app was opened on the `web.app` alias while Firebase redirect state used the `firebaseapp.com` auth domain. Canonicalized the alias before Firebase initialization, removed the app shell and registration script from service-worker precaching, enabled immediate worker activation, and forced worker control files to revalidate. | Pass — lint, type-check, 87 PWA tests, production build, private-data scan, live cache/security headers, and cached-client recovery from `web.app` to the authenticated capture screen with zero browser errors |
+| 2026-08-13 | Completed the first real iPhone camera submission. Two earlier `abandoned` entries were confirmed as truthful cleanup of incomplete upload reservations; no acknowledged receipt was lost. | Pass — evidence stored, durable acknowledgement returned, and receipt visible in authenticated history |
+| 2026-08-13 | Repaired the production processing chain: corrected the Cloud Tasks signing identity, normalized the OIDC audience to the worker service origin, added stale queued-work redispatch, resolved the frozen extraction contract inside the runtime image, and constrained Vertex output using a provider schema derived from that same canonical contract. Strict post-response JSON Schema validation remains in place. | Pass — preserved receipt reprocessed to `extracted` and `system_validated`; full backend lint, typing, and test suite passed |
+| 2026-08-13 | Repaired authenticated receipt-image display by allowing only the exact Google Cloud Storage image origin in CSP and versioning the application-shell cache so existing clients received the new policy. | Pass — production browser decoded the stored JPEG at its native dimensions with zero page alerts; 87 PWA tests and production build passed |
 
 ## Owner Gate C checklist
 

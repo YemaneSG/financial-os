@@ -159,7 +159,6 @@ _TERMINAL_PROCESSING: frozenset[ProcessingStatus] = frozenset(
 _RETRYABLE_PROCESSING: frozenset[ProcessingStatus] = frozenset(
     {
         ProcessingStatus.RETRYABLE_FAILED,
-        ProcessingStatus.FAILED,
     }
 )
 

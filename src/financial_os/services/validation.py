@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -22,16 +23,29 @@ from financial_os.domain.states import ValidationOutcome
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_PATH = (
-    Path(__file__).parent.parent.parent.parent / "contracts" / "extraction-result.schema.json"
-)
+_SCHEMA_FILENAME = "extraction-result.schema.json"
 _schema_cache: dict[str, Any] | None = None
 
 
-def _load_schema() -> dict[str, Any]:
+def _schema_path() -> Path:
+    """Resolve the frozen extraction contract in source and runtime layouts."""
+    configured_dir = os.environ.get("FINANCIAL_OS_CONTRACTS_DIR")
+    candidates = [
+        Path(configured_dir) / _SCHEMA_FILENAME if configured_dir else None,
+        Path.cwd() / "contracts" / _SCHEMA_FILENAME,
+        Path(__file__).resolve().parents[3] / "contracts" / _SCHEMA_FILENAME,
+    ]
+    for candidate in candidates:
+        if candidate is not None and candidate.is_file():
+            return candidate
+    raise FileNotFoundError("Extraction schema is not available in the runtime image")
+
+
+def load_extraction_schema() -> dict[str, Any]:
+    """Load the canonical extraction contract shared by generation and validation."""
     global _schema_cache
     if _schema_cache is None:
-        with _SCHEMA_PATH.open() as f:
+        with _schema_path().open() as f:
             _schema_cache = json.load(f)
     return _schema_cache
 
@@ -52,7 +66,7 @@ def validate_extraction_schema(raw: dict[str, Any]) -> None:
 
     Raises jsonschema.ValidationError on any violation (VAL-001, AI-03).
     """
-    schema = _load_schema()
+    schema = load_extraction_schema()
     jsonschema.validate(instance=raw, schema=schema)
 
 

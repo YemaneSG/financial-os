@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from financial_os.adapters.queue.base import QueueAdapter
@@ -35,6 +36,19 @@ class CloudTasksQueueAdapter(QueueAdapter):
         self._service_account_email = service_account_email
         self._project_id = project_id
         self._client: CloudTasksClient | None = None
+
+    @staticmethod
+    def _oidc_audience(worker_url: str) -> str:
+        """Return the stable Cloud Run service origin used by worker auth.
+
+        Receipt-specific paths must not enter the OIDC audience: the worker
+        validates tokens against its configured base URL, and Cloud Run uses
+        that same stable service audience for every internal route.
+        """
+        parsed = urlsplit(worker_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise QueueError("Invalid worker URL")
+        return f"{parsed.scheme}://{parsed.netloc}"
 
     def _get_client(self) -> CloudTasksClient:
         if self._client is None:
@@ -70,7 +84,7 @@ class CloudTasksQueueAdapter(QueueAdapter):
                 body=payload,
                 oidc_token=tasks_v2.OidcToken(
                     service_account_email=self._service_account_email,
-                    audience=worker_url,
+                    audience=self._oidc_audience(worker_url),
                 ),
             )
         )

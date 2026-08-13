@@ -39,6 +39,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 # Copy application entry point and migration assets.
 COPY contracts/ /app/contracts/
+ENV FINANCIAL_OS_CONTRACTS_DIR=/app/contracts
 COPY alembic/ /app/alembic/
 COPY alembic.ini /app/alembic.ini
 COPY apps/api/main.py /app/main.py

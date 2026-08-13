@@ -70,9 +70,7 @@ export function ReceiptDetailPage() {
     }
   }, [receiptId, load]);
 
-  const canRetry =
-    receipt?.processing_status === "retryable_failed" ||
-    receipt?.processing_status === "failed";
+  const canRetry = receipt?.processing_status === "retryable_failed";
 
   if (loading) return <LoadingSpinner label="Loading receipt…" />;
 

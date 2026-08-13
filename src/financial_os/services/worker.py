@@ -26,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import jsonschema
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -296,7 +296,6 @@ async def process_receipt(
             session,
             attempt_id,
             receipt,
-            "retryable",
             "WORKER_ERROR",
             correlation_id,
         )
@@ -456,10 +455,10 @@ async def _run_extraction_pipeline(
         run.status = ExtractionRunStatus.INVALID
         run.completed_at = _utc_now()
         session.add(run)
-        await _mark_attempt_terminal(
+        await _mark_attempt_failed(
             session, attempt_id, receipt, "SCHEMA_VALIDATION_FAILED", correlation_id
         )
-        return "terminal_failed", "SCHEMA_VALIDATION_FAILED"
+        return "retryable_failed", "SCHEMA_VALIDATION_FAILED"
 
     # ── Run deterministic arithmetic checks ───────────────────────────────────
     finding_data = run_deterministic_checks(result.raw)
@@ -635,7 +634,6 @@ async def _mark_attempt_failed(
     session: AsyncSession,
     attempt_id: uuid.UUID,
     receipt: Receipt,
-    failure_type: str,
     safe_error_code: str,
     correlation_id: str,
 ) -> None:
@@ -720,8 +718,8 @@ async def reconcile_processing(
     Detects and repairs:
     - Reserved/uploading receipts past stale threshold → abandoned.
     - Uploaded receipts not yet queued → re-enqueue.
-    - Queued/processing receipts past stale threshold → flag (manual review).
-    - Retryable failures eligible for another attempt → re-enqueue.
+    - Queued receipts past the stale threshold → dispatch a new attempt.
+    - Processing receipts past the lease threshold → flag for manual review.
 
     Never deletes evidence (OBJ-04, REL-001).
     """
@@ -740,6 +738,7 @@ async def reconcile_processing(
     )
     for receipt in stale_reserved.scalars():
         evaluated += 1
+        prev = receipt.processing_status
         receipt.processing_status = ProcessingStatus.ABANDONED
         receipt.row_version += 1
         session.add(receipt)
@@ -747,7 +746,7 @@ async def reconcile_processing(
             StateEvent(
                 receipt_id=receipt.id,
                 dimension=StateEventDimension.PROCESSING,
-                from_state=receipt.processing_status,
+                from_state=prev,
                 to_state=ProcessingStatus.ABANDONED,
                 actor_type=ActorType.SCHEDULER,
                 reason_code="stale_pre_acknowledged",
@@ -789,25 +788,69 @@ async def reconcile_processing(
                 extra={"receipt_id": str(receipt.id)},
             )
 
-    # ── Flag stale queued/processing receipts ─────────────────────────────────
+    # ── Recover queued receipts whose task was never delivered ────────────────
     stale_queued_cutoff = now - timedelta(seconds=settings.reconcile_queued_stale_seconds)
-    stale_processing_cutoff = now - timedelta(seconds=settings.reconcile_processing_stale_seconds)
-
-    stale_inflight = await session.execute(
+    stale_queued = await session.execute(
         select(Receipt).where(
-            or_(
-                and_(
-                    Receipt.processing_status == ProcessingStatus.QUEUED,
-                    Receipt.updated_at < stale_queued_cutoff,
-                ),
-                and_(
-                    Receipt.processing_status == ProcessingStatus.PROCESSING,
-                    Receipt.updated_at < stale_processing_cutoff,
-                ),
-            )
+            Receipt.processing_status == ProcessingStatus.QUEUED,
+            Receipt.updated_at < stale_queued_cutoff,
         )
     )
-    for receipt in stale_inflight.scalars():
+    for receipt in stale_queued.scalars():
+        evaluated += 1
+        latest_attempt = await session.execute(
+            select(func.max(ProcessingAttempt.attempt_number)).where(
+                ProcessingAttempt.receipt_id == receipt.id,
+                ProcessingAttempt.pipeline_version == settings.pipeline_version,
+            )
+        )
+        next_attempt = (latest_attempt.scalar_one_or_none() or 0) + 1
+        try:
+            task_name = await queue.enqueue_processing_task(
+                receipt_id=receipt.id,
+                pipeline_version=settings.pipeline_version,
+                attempt_number=next_attempt,
+            )
+            session.add(
+                ProcessingAttempt(
+                    receipt_id=receipt.id,
+                    pipeline_version=settings.pipeline_version,
+                    attempt_number=next_attempt,
+                    queue_task_name=task_name,
+                    status=AttemptStatus.QUEUED,
+                )
+            )
+            re_enqueued += 1
+            reason_code = "reconcile_queued_re_enqueue"
+        except Exception:
+            flagged += 1
+            reason_code = "reconcile_queued_dispatch_failed"
+            logger.warning(
+                "Reconcile queued dispatch failed",
+                extra={"receipt_id": str(receipt.id)},
+            )
+        session.add(
+            StateEvent(
+                receipt_id=receipt.id,
+                dimension=StateEventDimension.PROCESSING,
+                from_state=ProcessingStatus.QUEUED,
+                to_state=ProcessingStatus.QUEUED,
+                actor_type=ActorType.SCHEDULER,
+                reason_code=reason_code,
+                correlation_id=correlation_id,
+            )
+        )
+
+    # ── Flag stale processing leases for manual review ────────────────────────
+    stale_processing_cutoff = now - timedelta(seconds=settings.reconcile_processing_stale_seconds)
+
+    stale_processing = await session.execute(
+        select(Receipt).where(
+            Receipt.processing_status == ProcessingStatus.PROCESSING,
+            Receipt.updated_at < stale_processing_cutoff,
+        )
+    )
+    for receipt in stale_processing.scalars():
         evaluated += 1
         flagged += 1
         session.add(

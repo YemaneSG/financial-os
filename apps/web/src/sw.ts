@@ -42,7 +42,9 @@ registerRoute(
 registerRoute(
   new NavigationRoute(
     new NetworkFirst({
-      cacheName: "app-shell-v1",
+      // v2 invalidates documents cached before signed GCS receipt images were
+      // admitted by the exact-origin CSP.
+      cacheName: "app-shell-v2",
       plugins: [
         new CacheableResponsePlugin({ statuses: [200] }),
         new ExpirationPlugin({ maxAgeSeconds: 60 * 60 * 24 }),

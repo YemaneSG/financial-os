@@ -9,25 +9,88 @@ Prompt and schema versions are pinned via configuration — never inlined as lit
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import time
-from pathlib import Path
+from typing import Any
 
 from financial_os.adapters.extraction.base import (
     AssetForExtraction,
     ExtractionAdapter,
     ExtractionResult,
 )
+from financial_os.services.validation import load_extraction_schema
 
 logger = logging.getLogger(__name__)
 
-# Schema loaded once at import time — validated in tests, not at runtime startup.
-_SCHEMA_PATH = (
-    Path(__file__).parent.parent.parent.parent.parent
-    / "contracts"
-    / "extraction-result.schema.json"
-)
+_VERTEX_SCHEMA_FIELDS = {
+    "$defs",
+    "$ref",
+    "additionalProperties",
+    "anyOf",
+    "description",
+    "enum",
+    "format",
+    "items",
+    "maxItems",
+    "maxLength",
+    "maxProperties",
+    "maximum",
+    "minItems",
+    "minLength",
+    "minProperties",
+    "minimum",
+    "nullable",
+    "pattern",
+    "properties",
+    "propertyOrdering",
+    "required",
+    "title",
+    "type",
+}
+
+
+def _to_vertex_schema_node(node: dict[str, Any]) -> dict[str, Any]:
+    """Convert the canonical JSON Schema into Vertex's OpenAPI schema subset."""
+    converted: dict[str, Any] = {}
+
+    for key, value in node.items():
+        if key == "const":
+            converted["enum"] = [value]
+            continue
+        if key not in _VERTEX_SCHEMA_FIELDS:
+            continue
+
+        if key == "type" and isinstance(value, list):
+            non_null_types = [item for item in value if item != "null"]
+            if len(non_null_types) != 1:
+                raise ValueError("Vertex schema fields must have exactly one non-null type")
+            converted["type"] = non_null_types[0]
+            converted["nullable"] = "null" in value
+        elif key in {"properties", "$defs"}:
+            converted[key] = {
+                name: _to_vertex_schema_node(child) for name, child in value.items()
+            }
+        elif key in {"items", "additionalProperties"} and isinstance(value, dict):
+            converted[key] = _to_vertex_schema_node(value)
+        elif key == "anyOf":
+            converted[key] = [_to_vertex_schema_node(child) for child in value]
+        else:
+            converted[key] = copy.deepcopy(value)
+
+    # Controlled generation emits a stable, complete shape. Optional evidence
+    # stays explicit as null, which the canonical contract permits.
+    properties = converted.get("properties")
+    if converted.get("type") == "object" and properties:
+        converted["required"] = list(properties)
+
+    return converted
+
+
+def build_vertex_response_schema() -> dict[str, Any]:
+    """Build a fresh provider schema from the frozen canonical contract."""
+    return _to_vertex_schema_node(load_extraction_schema())
 
 
 class VertexExtractionAdapter(ExtractionAdapter):
@@ -83,6 +146,7 @@ class VertexExtractionAdapter(ExtractionAdapter):
 
         import vertexai
         from vertexai.generative_models import (
+            GenerationConfig,
             GenerativeModel,
             Image,
             Part,
@@ -102,10 +166,11 @@ class VertexExtractionAdapter(ExtractionAdapter):
         def _invoke() -> tuple[str, str | None]:
             response = model.generate_content(
                 parts,
-                generation_config={
-                    "response_mime_type": "application/json",
-                    "temperature": 0,
-                },
+                generation_config=GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=build_vertex_response_schema(),
+                    temperature=0,
+                ),
             )
             raw_text = response.text
             request_id = None

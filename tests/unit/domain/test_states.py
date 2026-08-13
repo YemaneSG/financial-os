@@ -66,6 +66,10 @@ class TestProcessingStateMachine:
     def test_retryable_failed_is_retryable(self):
         assert is_retryable(ProcessingStatus.RETRYABLE_FAILED)
 
+    def test_failed_is_terminal_and_not_retryable(self):
+        assert is_terminal_processing(ProcessingStatus.FAILED)
+        assert not is_retryable(ProcessingStatus.FAILED)
+
     def test_extracted_is_not_retryable(self):
         assert not is_retryable(ProcessingStatus.EXTRACTED)
 

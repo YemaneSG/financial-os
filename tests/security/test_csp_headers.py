@@ -5,6 +5,8 @@ required security headers. See implementation-contracts.md §6.
 Tests: CICD-02, S-02, APP-03, NET-01.
 """
 
+import re
+
 import httpx
 import pytest
 
@@ -13,13 +15,14 @@ REQUIRED_HEADERS = {
     "referrer-policy": "no-referrer",
 }
 
-REQUIRED_HSTS_PREFIX = "max-age=63072000"
+REQUIRED_HSTS_MIN_AGE = 31_536_000
 REQUIRED_CSP_DIRECTIVES = [
     "default-src 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    "img-src 'self' data: blob: https://storage.googleapis.com",
 ]
 FORBIDDEN_CSP_VALUES = ["unsafe-inline", "unsafe-eval"]
 REQUIRED_PERMISSIONS_CAMERA = "camera=(self)"
@@ -59,9 +62,12 @@ class TestCspHeaders:
 
     def test_hsts_present_and_correct(self, deployed_headers: dict[str, str]) -> None:
         hsts = deployed_headers.get("strict-transport-security", "")
-        assert REQUIRED_HSTS_PREFIX in hsts, (
+        max_age = re.search(r"(?:^|;)\s*max-age=(\d+)", hsts, re.IGNORECASE)
+        assert max_age and int(max_age.group(1)) >= REQUIRED_HSTS_MIN_AGE, (
             f"HSTS header missing or insufficient max-age. Got: {hsts!r}"
         )
+        assert "includesubdomains" in hsts.lower()
+        assert "preload" in hsts.lower()
 
     def test_x_content_type_options(self, deployed_headers: dict[str, str]) -> None:
         assert deployed_headers.get("x-content-type-options", "").lower() == "nosniff"

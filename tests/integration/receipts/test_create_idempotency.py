@@ -14,8 +14,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy import select
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from financial_os.adapters.extraction.fake import FakeExtractionAdapter
@@ -27,7 +26,6 @@ from financial_os.auth.firebase import VerifiedOwner
 from financial_os.config import Settings
 from financial_os.models import Base
 from financial_os.models.auth import AuthSubject
-from financial_os.models.receipt import Receipt
 from tests.fixtures.factories import make_create_receipt_payload
 
 pytestmark = [
