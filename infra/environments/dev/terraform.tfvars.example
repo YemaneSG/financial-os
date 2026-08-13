@@ -21,7 +21,7 @@ sql_tier              = "db-g1-small"
 sql_availability_type = "ZONAL"
 
 github_org  = "your-github-org"
-github_repo = "FinancialOs"
+github_repo = "financial-os"
 
 # Replace after the phase-one registry bootstrap. The all-zero digest is an
 # intentionally non-deployable placeholder that keeps targeted planning safe.
