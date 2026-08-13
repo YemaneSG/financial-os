@@ -9,8 +9,9 @@ import {
 import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
@@ -46,6 +47,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [signInError, setSignInError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Complete a redirect-based sign-in before subscribing to auth state.
+    // Redirects are more reliable than popups in mobile and embedded browsers.
+    void getRedirectResult(auth).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("network")) {
+        setSignInError("Network error. Check your connection and try again.");
+      } else {
+        setSignInError("Sign-in failed. Please try again.");
+      }
+    });
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setAuthState({ status: "authenticated", user });
@@ -72,12 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async () => {
     setSignInError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Sign-in failed. Please try again.";
       // Never expose raw Firebase error details — show a safe message.
-      if (msg.includes("popup-closed") || msg.includes("cancelled")) {
+      if (msg.includes("cancelled")) {
         setSignInError("Sign-in was cancelled.");
       } else if (msg.includes("network")) {
         setSignInError("Network error. Check your connection and try again.");

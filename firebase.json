@@ -1,12 +1,7 @@
 {
-  "_comment": "Template — copy to repository root before firebase deploy. Do NOT add unsafe-inline or unsafe-eval (S-02). Verify actual deployed headers match; see tests/security/test_csp_headers.py.",
   "hosting": {
     "public": "apps/web/dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
     "trailingSlash": false,
     "rewrites": [

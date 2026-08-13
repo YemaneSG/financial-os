@@ -1,6 +1,5 @@
 # Terraform state and backend config — never commit.
 **/.terraform/
-**/.terraform.lock.hcl
 **/terraform.tfstate
 **/terraform.tfstate.backup
 **/terraform.tfvars

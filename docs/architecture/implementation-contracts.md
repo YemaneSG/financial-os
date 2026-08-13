@@ -230,7 +230,7 @@ Content-Security-Policy:
     https://firebaseinstallations.googleapis.com;
   img-src 'self' data: blob:;
   media-src blob:;
-  frame-src https://accounts.google.com;
+  frame-src 'self' https://accounts.google.com;
   frame-ancestors 'none';
   object-src 'none';
   base-uri 'self';

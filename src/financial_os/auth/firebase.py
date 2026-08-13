@@ -48,9 +48,11 @@ async def verify_owner_token(
     token: str,
     settings: Settings,
 ) -> VerifiedOwner | None:
-    """Verify a Firebase Bearer token and return VerifiedOwner or None.
+    """Verify a Firebase Bearer token and return its stable subject or None.
 
-    Returns None for expired, invalid, or non-allowlisted tokens.
+    Returns None for expired or invalid tokens. Owner authorization is enforced
+    separately so a valid non-owner receives 403 rather than being confused
+    with an invalid credential (IAM-01).
     Never logs the token value or any PII from claims (LOG-01).
     """
     import asyncio
@@ -73,15 +75,6 @@ async def verify_owner_token(
         return None
 
     provider_subject = f"google:{claims.get('sub', '')}"
-    allowed = settings.allowed_owner_subjects
-
-    if provider_subject not in allowed:
-        logger.info(
-            "Token rejected — subject not in allowlist",
-            extra={"reason": "not_allowlisted"},
-        )
-        return None
-
     auth_time_claim = claims.get("auth_time", 0)
     auth_time = (
         auth_time_claim

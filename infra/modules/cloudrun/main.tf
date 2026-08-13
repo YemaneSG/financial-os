@@ -89,6 +89,13 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
 
+      # Cloud Run adds this mount automatically when a Cloud SQL volume is
+      # declared. Keep it explicit so the provider does not report drift.
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+
       startup_probe {
         http_get {
           path = "/health/live"
@@ -122,6 +129,9 @@ resource "google_cloud_run_v2_service" "api" {
     # Prevent Terraform from downgrading a revision that was already deployed
     # with traffic. Traffic switching is done explicitly by the deploy workflow.
     ignore_changes = [
+      client,
+      client_version,
+      scaling,
       template[0].containers[0].image,
       traffic,
     ]
@@ -230,6 +240,11 @@ resource "google_cloud_run_v2_service" "worker" {
         }
       }
 
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+
       startup_probe {
         http_get {
           path = "/health/live"
@@ -251,6 +266,9 @@ resource "google_cloud_run_v2_service" "worker" {
 
   lifecycle {
     ignore_changes = [
+      client,
+      client_version,
+      scaling,
       template[0].containers[0].image,
       traffic,
     ]
@@ -269,9 +287,10 @@ resource "google_cloud_run_v2_service_iam_member" "worker_task_invoker" {
 # ── Migration job (pre-deploy, one-shot) ──────────────────────────────────────
 
 resource "google_cloud_run_v2_job" "migrate" {
-  project  = var.project_id
-  name     = "financial-os-${var.environment}-migrate"
-  location = var.region
+  project             = var.project_id
+  name                = "financial-os-${var.environment}-migrate"
+  location            = var.region
+  deletion_protection = false # Disposable runner; the database remains protected.
 
   template {
     template {
@@ -291,7 +310,8 @@ resource "google_cloud_run_v2_job" "migrate" {
         name  = "migrate"
         image = var.image_with_digest
 
-        command = ["alembic", "upgrade", "head"]
+        command = ["alembic"]
+        args    = ["upgrade", "head"]
 
         env {
           name  = "CLOUD_SQL_INSTANCE_CONNECTION_NAME"
@@ -300,6 +320,14 @@ resource "google_cloud_run_v2_job" "migrate" {
         env {
           name  = "DATABASE_IAM_USER"
           value = trimsuffix(var.migrate_sa_email, ".gserviceaccount.com")
+        }
+        env {
+          name  = "API_DATABASE_USER"
+          value = trimsuffix(var.api_sa_email, ".gserviceaccount.com")
+        }
+        env {
+          name  = "WORKER_DATABASE_USER"
+          value = trimsuffix(var.worker_sa_email, ".gserviceaccount.com")
         }
 
         resources {
@@ -321,6 +349,12 @@ resource "google_cloud_run_v2_job" "migrate" {
             }
           }
         }
+
+
+        volume_mounts {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
       }
 
       volumes {
@@ -333,6 +367,10 @@ resource "google_cloud_run_v2_job" "migrate" {
   }
 
   lifecycle {
-    ignore_changes = [template[0].template[0].containers[0].image]
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].template[0].containers[0].image,
+    ]
   }
 }

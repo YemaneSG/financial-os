@@ -89,7 +89,7 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        return self.environment == "production"
+        return self.environment not in ("development", "test")
 
     @property
     def use_cloud_sql(self) -> bool:

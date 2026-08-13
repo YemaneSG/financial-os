@@ -214,6 +214,9 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
           VITE_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
 
       - name: Authenticate to GCP (WIF)
@@ -228,7 +231,7 @@ jobs:
           pnpm dlx firebase-tools@14.13.0 deploy
           --only hosting
           --non-interactive
-          --config infra/hosting/firebase.json
+          --config firebase.json
           --project "${{ vars.FIREBASE_PROJECT_ID }}"
 
       # Verify security headers on the deployed site (S-02, CICD-02).

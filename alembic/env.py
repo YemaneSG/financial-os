@@ -15,6 +15,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy.engine import Connection
+from sqlalchemy.sql import text
 
 from financial_os.config import get_settings
 from financial_os.database import build_engine
@@ -30,6 +31,9 @@ from financial_os.models.extraction import (  # noqa: F401
 )
 from financial_os.models.findings import ValidationFinding  # noqa: F401
 from financial_os.models.receipt import ProcessingAttempt, Receipt, ReceiptAsset  # noqa: F401
+from financial_os.operations.bootstrap_database_access import (
+    build_migration_default_privileges_sql,
+)
 
 config = context.config
 
@@ -52,6 +56,15 @@ def get_database_url() -> str:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    # The migration identity owns all objects it creates, so PostgreSQL requires
+    # it—not the built-in administrator—to define future-object privileges.
+    privilege_sql = build_migration_default_privileges_sql(
+        api_role=os.environ.get("API_DATABASE_USER", ""),
+        worker_role=os.environ.get("WORKER_DATABASE_USER", ""),
+    )
+    for statement in privilege_sql.split(";"):
+        if statement.strip():
+            connection.execute(text(statement))
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -65,7 +78,10 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_migrations_online() -> None:
     """Run migrations using an async connection."""
     database = build_engine(get_settings())
-    async with database.engine.connect() as conn:
+    # The default-privilege statements start PostgreSQL's implicit transaction
+    # before Alembic enters its context manager. Own the outer transaction here
+    # so a successful migration is committed instead of rolled back on close.
+    async with database.engine.begin() as conn:
         await conn.run_sync(do_run_migrations)
     await database.close()
 

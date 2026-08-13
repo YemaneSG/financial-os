@@ -8,6 +8,7 @@ Services never call alembic upgrade head at startup (A-02).
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast
@@ -55,10 +56,18 @@ def build_engine(settings: Settings) -> DatabaseRuntime:
         if not settings.database_iam_user:
             raise ValueError("DATABASE_IAM_USER is required when Cloud SQL is enabled")
 
-        connector = Connector(refresh_strategy="LAZY")
+        runtime: DatabaseRuntime
 
         async def getconn() -> AsyncDatabaseConnection:
-            connection = await connector.connect_async(
+            # Bind the connector to the event loop that actually opens the
+            # asyncpg connection. App construction can happen before that loop
+            # exists, so eager connector construction is unsafe.
+            if runtime.connector is None:
+                runtime.connector = Connector(
+                    loop=asyncio.get_running_loop(),
+                    refresh_strategy="LAZY",
+                )
+            connection = await runtime.connector.connect_async(
                 settings.cloud_sql_instance_connection_name,
                 "asyncpg",
                 user=settings.database_iam_user,
@@ -75,7 +84,8 @@ def build_engine(settings: Settings) -> DatabaseRuntime:
             pool_size=5,
             max_overflow=10,
         )
-        return DatabaseRuntime(engine=engine, connector=connector)
+        runtime = DatabaseRuntime(engine=engine)
+        return runtime
     else:
         engine = create_async_engine(
             settings.database_url,

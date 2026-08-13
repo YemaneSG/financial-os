@@ -164,7 +164,7 @@ resource "google_monitoring_alert_policy" "rel001_violation" {
   conditions {
     display_name = "REL-001 invariant violation detected"
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/financial_os/invariant_violation_rel001_total\""
+      filter          = "metric.type=\"logging.googleapis.com/user/financial_os/invariant_violation_rel001_total\" AND resource.type=\"cloud_run_revision\""
       comparison      = "COMPARISON_GT"
       threshold_value = 0
       duration        = "0s"
@@ -191,7 +191,7 @@ resource "google_monitoring_alert_policy" "processing_failures" {
   conditions {
     display_name = "Terminal failures > 5 in 10 min"
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/financial_os/processing_terminal_failures_total\""
+      filter          = "metric.type=\"logging.googleapis.com/user/financial_os/processing_terminal_failures_total\" AND resource.type=\"cloud_run_revision\""
       comparison      = "COMPARISON_GT"
       threshold_value = 5
       duration        = "0s"
@@ -214,7 +214,7 @@ resource "google_monitoring_alert_policy" "cost_circuit_breaker" {
   conditions {
     display_name = "Any cost ceiling exceeded event"
     condition_threshold {
-      filter          = "metric.type=\"logging.googleapis.com/user/financial_os/cost_ceiling_exceeded_total\""
+      filter          = "metric.type=\"logging.googleapis.com/user/financial_os/cost_ceiling_exceeded_total\" AND resource.type=\"cloud_run_revision\""
       comparison      = "COMPARISON_GT"
       threshold_value = 0
       duration        = "0s"

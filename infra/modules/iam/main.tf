@@ -99,6 +99,27 @@ resource "google_project_iam_member" "api_tasks_enqueuer" {
   member  = "serviceAccount:${google_service_account.api.email}"
 }
 
+# Readiness probes verify only that the configured bucket and queue exist.
+# Keep these two read permissions in a dedicated custom role instead of
+# granting broad Storage or Cloud Tasks viewer access.
+resource "google_project_iam_custom_role" "api_health_reader" {
+  project     = var.project_id
+  role_id     = "financialOsApiHealthReader"
+  title       = "Financial OS API health reader"
+  description = "Exact read permissions required by API readiness probes."
+  permissions = [
+    "cloudtasks.queues.get",
+    "serviceusage.services.use",
+    "storage.buckets.get",
+  ]
+}
+
+resource "google_project_iam_member" "api_health_reader" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.api_health_reader.name
+  member  = "serviceAccount:${google_service_account.api.email}"
+}
+
 # Creating an OIDC task requires the enqueuer to act as the task identity.
 resource "google_service_account_iam_member" "api_acts_as_task_invoker" {
   service_account_id = google_service_account.task_invoker.name
@@ -116,6 +137,14 @@ resource "google_project_iam_member" "api_metric_writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
   member  = "serviceAccount:${google_service_account.api.email}"
+}
+
+# The API signs short-lived GCS capabilities through IAM Credentials. Grant the
+# runtime identity signBlob on itself only; no private key is created (OBJ-02).
+resource "google_service_account_iam_member" "api_signs_as_self" {
+  service_account_id = google_service_account.api.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.api.email}"
 }
 
 # ── Worker service account IAM bindings ───────────────────────────────────────
@@ -160,12 +189,6 @@ resource "google_project_iam_member" "worker_metric_writer" {
 # Bound at the service level after cloudrun module creates the worker service.
 # The caller passes worker_service_url; binding is conditional on it being set.
 
-resource "google_project_iam_member" "task_invoker_sa_user" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountTokenCreator"
-  member  = "serviceAccount:${google_service_account.task_invoker.email}"
-}
-
 # ── Migrate service account ───────────────────────────────────────────────────
 
 resource "google_project_iam_member" "migrate_sql_client" {
@@ -177,6 +200,15 @@ resource "google_project_iam_member" "migrate_sql_client" {
 resource "google_project_iam_member" "migrate_sql_instance_user" {
   project = var.project_id
   role    = "roles/cloudsql.instanceUser"
+  member  = "serviceAccount:${google_service_account.migrate.email}"
+}
+
+# The one-shot migration job reads DATABASE_URL from Secret Manager. No
+# credentials are baked into its image; this matches the API/worker delivery
+# mechanism.
+resource "google_project_iam_member" "migrate_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.migrate.email}"
 }
 

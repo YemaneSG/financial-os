@@ -51,9 +51,12 @@ resource "google_storage_bucket_iam_member" "api_object_viewer" {
   member = "serviceAccount:${var.api_sa_email}"
 }
 
-# The API SA also needs to create objects (for the signed URL capability
-# that the client uses to PUT). The signBlob permission is on the SA itself
-# (roles/iam.serviceAccountTokenCreator), not on the bucket.
-# We do NOT grant objectCreator here; uploads go directly from the client
-# via the signed URL — the bucket accepts them because the URL is signed by
-# the API SA.
+# The signed URL is authorized as the API SA, so that principal must be able
+# to create the destination object even though the browser sends the bytes
+# directly to GCS. The signBlob permission itself is granted on the SA in the
+# IAM module; this bucket grant is deliberately create-only.
+resource "google_storage_bucket_iam_member" "api_object_creator" {
+  bucket = google_storage_bucket.evidence.name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${var.api_sa_email}"
+}

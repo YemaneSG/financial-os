@@ -1,0 +1,19 @@
+# Reproducible remote build for the shared API/worker/migration image.
+# Pass an Artifact Registry image tag as the required _IMAGE substitution.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - apps/api/Dockerfile
+      - --tag
+      - ${_IMAGE}
+      - .
+
+images:
+  - ${_IMAGE}
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1200s

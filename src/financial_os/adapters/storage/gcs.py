@@ -47,12 +47,21 @@ class _StorageClient(Protocol):
     def bucket(self, bucket_name: str) -> _Bucket: ...
 
 
+class _RefreshableCredentials(Protocol):
+    token: str | None
+    valid: bool
+    service_account_email: str
+
+    def refresh(self, request: object) -> None: ...
+
+
 class GCSStorageAdapter(StorageAdapter):
     """Storage adapter backed by Google Cloud Storage."""
 
     def __init__(self, bucket_name: str) -> None:
         self._bucket_name = bucket_name
         self._client: _StorageClient | None = None
+        self._credentials: _RefreshableCredentials | None = None
 
     def _get_client(self) -> _StorageClient:
         if self._client is None:
@@ -60,6 +69,33 @@ class GCSStorageAdapter(StorageAdapter):
 
             self._client = cast(_StorageClient, Client())
         return self._client
+
+    def _get_remote_signing_identity(self) -> tuple[str, str] | None:
+        """Return the Cloud Run identity and token used by IAM signBlob.
+
+        Compute credentials do not contain a private key. Passing their service
+        account email and access token makes the storage library call the IAM
+        Credentials signBlob API instead, preserving the keyless runtime.
+        """
+        if self._credentials is None:
+            import google.auth
+
+            raw_credentials, _ = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            self._credentials = cast(_RefreshableCredentials, raw_credentials)
+
+        credentials: _RefreshableCredentials = self._credentials
+        if not credentials.valid or not credentials.token:
+            from google.auth.transport.requests import Request
+
+            credentials.refresh(Request())
+
+        email = getattr(credentials, "service_account_email", "")
+        token = credentials.token or ""
+        if not email or not token:
+            return None
+        return email, token
 
     async def generate_upload_capability(
         self,
@@ -75,11 +111,19 @@ class GCSStorageAdapter(StorageAdapter):
             client = self._get_client()
             bucket = client.bucket(self._bucket_name)
             blob = bucket.blob(object_key)
+            remote_identity = self._get_remote_signing_identity()
+            signing_kwargs: dict[str, object] = {}
+            if remote_identity is not None:
+                signing_kwargs = {
+                    "service_account_email": remote_identity[0],
+                    "access_token": remote_identity[1],
+                }
             url = blob.generate_signed_url(
                 version="v4",
                 expiration=dt.timedelta(seconds=lifetime_seconds),
                 method="PUT",
                 content_type=declared_mime_type,
+                **signing_kwargs,
             )
             return url
 
@@ -112,10 +156,18 @@ class GCSStorageAdapter(StorageAdapter):
             client = self._get_client()
             bucket = client.bucket(self._bucket_name)
             blob = bucket.blob(object_key, generation=int(generation))
+            remote_identity = self._get_remote_signing_identity()
+            signing_kwargs: dict[str, object] = {}
+            if remote_identity is not None:
+                signing_kwargs = {
+                    "service_account_email": remote_identity[0],
+                    "access_token": remote_identity[1],
+                }
             url = blob.generate_signed_url(
                 version="v4",
                 expiration=dt.timedelta(seconds=lifetime_seconds),
                 method="GET",
+                **signing_kwargs,
             )
             return url
 

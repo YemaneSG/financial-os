@@ -48,6 +48,12 @@ async def get_verified_owner(
             detail={"error_code": "UNAUTHORIZED", "message": "Authentication required."},
         )
 
+    if owner.subject_id not in settings.allowed_owner_subjects:
+        raise HTTPException(
+            status_code=403,
+            detail={"error_code": "FORBIDDEN", "message": "Access denied."},
+        )
+
     # Session-version check (IAM-02): validate auth_time against valid_after in DB.
     # This check happens here for all protected routes.
     # The service layer resolves the DB-side auth_subject; we pass the raw owner through.
