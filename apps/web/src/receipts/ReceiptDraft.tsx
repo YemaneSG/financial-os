@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import type { DraftImage } from "./useDraft";
+import { canPreviewReceipt } from "./receiptFile";
 
 interface ReceiptDraftProps {
   images: DraftImage[];
@@ -91,11 +92,17 @@ export function ReceiptDraft({
               aria-pressed={img.id === selected}
               onClick={() => setSelected(img.id)}
             >
-              <img
-                src={img.objectUrl}
-                alt={`Receipt image ${i + 1}`}
-                className="draft-thumbnail__img"
-              />
+              {canPreviewReceipt(img.file) ? (
+                <img
+                  src={img.objectUrl}
+                  alt={`Receipt image ${i + 1}`}
+                  className="draft-thumbnail__img"
+                />
+              ) : (
+                <span className="draft-thumbnail__fallback" aria-hidden="true">
+                  HEIC
+                </span>
+              )}
               <span className="draft-thumbnail__num" aria-hidden="true">
                 {i + 1}
               </span>
@@ -107,11 +114,18 @@ export function ReceiptDraft({
       {/* Full preview */}
       {selectedImage && (
         <div className="draft-preview">
-          <img
-            src={selectedImage.objectUrl}
-            alt={`Preview of receipt image ${images.indexOf(selectedImage) + 1}`}
-            className="draft-preview__img"
-          />
+          {canPreviewReceipt(selectedImage.file) ? (
+            <img
+              src={selectedImage.objectUrl}
+              alt={`Preview of receipt image ${images.indexOf(selectedImage) + 1}`}
+              className="draft-preview__img"
+            />
+          ) : (
+            <div className="draft-preview__fallback" role="status">
+              <strong>HEIC photo ready</strong>
+              <span>This browser cannot preview HEIC, but the original photo can still upload.</span>
+            </div>
+          )}
 
           <div className="draft-preview__actions" role="group" aria-label="Image actions">
             <button

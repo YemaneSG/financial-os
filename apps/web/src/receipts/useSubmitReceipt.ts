@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import { apiClient, uploadAsset, ApiClientError, NetworkError } from "@/api/client";
 import type { DraftImage, UploadProgress } from "./useDraft";
+import { receiptMimeType } from "./receiptFile";
 
 interface SubmitCallbacks {
   onUploadProgress: (progress: UploadProgress) => void;
@@ -30,6 +31,12 @@ export function useSubmitReceipt() {
       const { onUploadProgress, onSaved, onError, onPhase } = callbacks;
       onPhase("uploading");
 
+      const mimeTypes = images.map((image) => receiptMimeType(image.file));
+      if (mimeTypes.some((mimeType) => mimeType === null)) {
+        onError("One or more images have an unsupported file type.");
+        return;
+      }
+
       // Always POST createReceipt — idempotent by client_submission_key.
       // Server returns same receipt with FRESH upload capabilities on replay.
       let receiptId: string;
@@ -40,7 +47,7 @@ export function useSubmitReceipt() {
           expected_asset_count: images.length,
           assets: images.map((img, i) => ({
             ordinal: i + 1,
-            declared_mime_type: img.file.type || "image/jpeg",
+            declared_mime_type: mimeTypes[i] as string,
             byte_size: img.file.size,
           })),
         });
@@ -87,7 +94,9 @@ export function useSubmitReceipt() {
           onUploadProgress({ ...progressBase, loaded: 0, done: false, error: null });
 
           try {
-            await uploadAsset(cap.upload_url, img.file, (loaded, total) => {
+            const signedContentType = cap.allowed_mime_types[0] ?? mimeTypes[i];
+            if (!signedContentType) throw new NetworkError("Upload type is unavailable");
+            await uploadAsset(cap.upload_url, img.file, signedContentType, (loaded, total) => {
               onUploadProgress({ ...progressBase, loaded, total, done: false, error: null });
             });
             onUploadProgress({ ...progressBase, loaded: img.file.size, done: true, error: null });

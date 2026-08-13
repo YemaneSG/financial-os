@@ -121,12 +121,13 @@ export const apiClient = {
 export async function uploadAsset(
   uploadUrl: string,
   file: File,
+  contentType: string,
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("Content-Type", contentType);
     if (onProgress) {
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) onProgress(e.loaded, e.total);

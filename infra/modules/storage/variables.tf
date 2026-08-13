@@ -25,6 +25,6 @@ variable "worker_sa_email" {
 
 variable "cors_origin" {
   type        = string
-  description = "Deployed Firebase Hosting origin allowed for signed-URL upload CORS."
+  description = "Primary Firebase web.app origin; its exact firebaseapp.com alias is also allowed."
   default     = "https://example.invalid"
 }

@@ -21,9 +21,13 @@ resource "google_storage_bucket" "evidence" {
   }
 
   # CORS: allow PUT only from the deployed app origin (short-lived signed URL
-  # upload). The origin is set by var.cors_origin.
+  # upload). Firebase serves the same site on web.app and firebaseapp.com;
+  # allow both exact origins so either canonical Firebase URL can upload.
   cors {
-    origin          = [var.cors_origin]
+    origin = distinct([
+      var.cors_origin,
+      replace(var.cors_origin, ".web.app", ".firebaseapp.com"),
+    ])
     method          = ["PUT", "GET", "HEAD", "OPTIONS"]
     response_header = ["Content-Type", "Content-MD5", "Content-Length"]
     max_age_seconds = 600

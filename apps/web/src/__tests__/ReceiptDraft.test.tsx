@@ -3,10 +3,10 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ReceiptDraft } from "@/receipts/ReceiptDraft";
 import type { DraftImage } from "@/receipts/useDraft";
 
-function makeImage(id: string, name = "photo.jpg"): DraftImage {
+function makeImage(id: string, name = "photo.jpg", type = "image/jpeg"): DraftImage {
   return {
     id,
-    file: new File(["content"], name, { type: "image/jpeg" }),
+    file: new File(["content"], name, { type }),
     objectUrl: `blob:test/${id}`,
   };
 }
@@ -46,6 +46,13 @@ describe("ReceiptDraft", () => {
     expect(screen.getByRole("list", { name: /receipt images/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Image 1, selected" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Image 2" })).toBeInTheDocument();
+  });
+
+  it("shows an intentional fallback instead of a broken HEIC preview", () => {
+    renderDraft([makeImage("heic-1", "IMG_0001.HEIC", "")]);
+    expect(screen.getByRole("status")).toHaveTextContent("HEIC photo ready");
+    expect(screen.getByRole("status")).toHaveTextContent("original photo can still upload");
+    expect(screen.queryByAltText(/preview of receipt image/i)).not.toBeInTheDocument();
   });
 
   it("submit button is disabled when no images", () => {

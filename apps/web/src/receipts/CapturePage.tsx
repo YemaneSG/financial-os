@@ -21,6 +21,7 @@ export function CapturePage() {
   }, [draft, submit]);
 
   const handleRetry = useCallback(async () => {
+    draft.clearError();
     draft.setPhase("uploading");
     await submit(draft.state.clientSubmissionKey, draft.state.images, {
       onUploadProgress: draft.setUploadProgress,

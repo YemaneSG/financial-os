@@ -60,6 +60,7 @@ failure/review state.
 | 2026-08-13 | Verified authenticated owner history query against the deployed API and Cloud SQL; clean first-run result contained zero receipts. | Pass |
 | 2026-08-13 | Final Terraform convergence plan. | Pass — no changes |
 | 2026-08-13 | Corrected Firebase root caching after an iPhone received the pre-release placeholder. Both hosting domains now return Financial OS with `no-cache, no-store, must-revalidate`; security headers were revalidated. | Pass |
+| 2026-08-13 | Diagnosed the first live HEIC attempt: the browser omitted `File.type`, creating a signed-header mismatch, and the `firebaseapp.com` alias was absent from bucket CORS. Deployed extension-based allowlisted MIME inference, exact signed/upload header matching, magic-byte MIME recording, a truthful HEIC preview fallback, retry-state clearing, and both exact Firebase origins. | Pass — 83 PWA tests, 84 backend tests, and live CORS preflights from both origins |
 
 ## Owner Gate C checklist
 

@@ -37,6 +37,15 @@ describe("useDraft", () => {
     expect(result.current.state.errorMessage).toMatch(/supported/i);
   });
 
+  it("accepts an iPhone HEIC file when the browser omits File.type", () => {
+    const { result } = renderHook(() => useDraft());
+    act(() => {
+      result.current.addImages([makeFile("IMG_0001.HEIC", 3 * 1024 * 1024, "")]);
+    });
+    expect(result.current.state.images).toHaveLength(1);
+    expect(result.current.state.errorMessage).toBeNull();
+  });
+
   it("rejects files exceeding 10 MB", () => {
     const { result } = renderHook(() => useDraft());
     const bigFile = makeFile("big.jpg", 11 * 1024 * 1024);

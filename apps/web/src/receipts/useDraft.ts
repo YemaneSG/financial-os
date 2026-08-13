@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { receiptMimeType } from "./receiptFile";
 
 export interface DraftImage {
   id: string;
@@ -61,7 +62,6 @@ export function useDraft() {
 
   const addImages = useCallback(
     (files: File[]) => {
-      const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/heic", "image/heif", "image/webp"];
       const MAX_BYTES = 10 * 1024 * 1024;
       const MAX_COUNT = 10;
 
@@ -69,7 +69,7 @@ export function useDraft() {
       const valid: File[] = [];
 
       for (const file of files) {
-        if (!ALLOWED_TYPES.includes(file.type) && !file.name.toLowerCase().match(/\.(heic|heif)$/)) {
+        if (receiptMimeType(file) === null) {
           errors.push(`"${file.name}" is not a supported image format (JPEG, PNG, HEIC, WebP).`);
           continue;
         }

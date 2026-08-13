@@ -40,7 +40,7 @@ from financial_os.domain.states import (
 from financial_os.models.events import StateEvent
 from financial_os.models.receipt import ProcessingAttempt, Receipt, ReceiptAsset
 from financial_os.schemas import receipt as rschemas
-from financial_os.schemas.common import is_decodable_image
+from financial_os.schemas.common import ALLOWED_ASSET_MIME_TYPES, detect_mime_from_magic
 
 if TYPE_CHECKING:
     from financial_os.config import Settings
@@ -284,7 +284,7 @@ async def finalize_receipt(
         raise EvidenceIncompleteError("Expected asset count does not match stored assets.")
 
     # Verify each asset against GCS (OBJ-03).
-    verified_data: list[tuple[ReceiptAsset, bytes, str, str]] = []
+    verified_data: list[tuple[ReceiptAsset, bytes, str, str, str]] = []
     for asset in assets:
         try:
             data = await storage.read_object_bytes(asset.object_key)
@@ -303,7 +303,8 @@ async def finalize_receipt(
             raise EvidenceIncompleteError("Asset exceeds maximum byte size.")
 
         # Magic byte / MIME check (decodable image content).
-        if not is_decodable_image(data):
+        detected_mime_type = detect_mime_from_magic(data)
+        if detected_mime_type not in ALLOWED_ASSET_MIME_TYPES:
             raise EvidenceIncompleteError("Asset is not a recognised image format.")
 
         # Compute SHA-256 for generation binding.
@@ -313,14 +314,14 @@ async def finalize_receipt(
         meta = await storage.get_object_metadata(asset.object_key)
         generation = meta.generation if meta else "0"
 
-        verified_data.append((asset, data, sha256, generation))
+        verified_data.append((asset, data, sha256, generation, detected_mime_type))
 
     # Single transaction: mark assets verified, update receipt status, record events.
     now = _utc_now()
-    for asset, data, sha256, generation in verified_data:
+    for asset, data, sha256, generation, detected_mime_type in verified_data:
         asset.storage_generation = generation
         asset.sha256 = sha256
-        asset.verified_mime_type = asset.declared_mime_type  # magic verified above
+        asset.verified_mime_type = detected_mime_type
         asset.byte_size = len(data)
         asset.upload_status = UploadStatus.VERIFIED
         asset.verified_at = now

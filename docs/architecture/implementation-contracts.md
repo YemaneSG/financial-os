@@ -297,6 +297,19 @@ The server stores `client_submission_key` verbatim in `receipts.client_submissio
 |---|---|---|
 | `MAX_ASSETS_PER_EXTRACTION` | 10 | Matches `MAX_ASSETS_PER_RECEIPT` enforced at create time |
 | `MAX_ASSET_BYTES` | 10,485,760 (10 MiB) | Per-image limit after EXIF strip; typical iPhone HEIC/JPEG range |
+
+HEIC/HEIF handling is explicit:
+
+- When a browser leaves `File.type` empty, the PWA infers only allowlisted
+  image types from a case-insensitive filename extension.
+- The MIME type bound into the signed upload URL and the upload
+  `Content-Type` header must be identical.
+- Evidence verification records the MIME type detected from file magic, not an
+  untrusted client declaration.
+- Browsers that cannot decode HEIC for local preview show a truthful
+  **HEIC photo ready** fallback; lack of preview does not discard the original.
+- GCS CORS permits only the two exact Firebase Hosting aliases (`web.app` and
+  `firebaseapp.com`) for the deployed project; wildcards remain prohibited.
 | `MAX_TOTAL_EXTRACTION_BYTES` | 52,428,800 (50 MiB) | Total bytes across all assets in one extraction call |
 | `MAX_PROMPT_TOKENS` | Set after P-01 benchmark | TBD; placeholder until benchmark evidence exists |
 | `MAX_EXTRACTION_COST_CENTS` | 50 (USD cents) | Terminal cost circuit breaker per extraction attempt |
