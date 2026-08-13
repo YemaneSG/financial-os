@@ -1,13 +1,9 @@
-import { StrictMode } from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./styles/global.css";
+import { getCanonicalFirebaseUrl } from "./auth/canonicalHost";
 
-const root = document.getElementById("root");
-if (!root) throw new Error("Root element not found");
+const canonicalUrl = getCanonicalFirebaseUrl(window.location.href);
 
-ReactDOM.createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+if (canonicalUrl) {
+  window.location.replace(canonicalUrl);
+} else {
+  void import("./bootstrap").then(({ renderApp }) => renderApp());
+}

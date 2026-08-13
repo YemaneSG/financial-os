@@ -9,6 +9,7 @@ import { ExpirationPlugin } from "workbox-expiration";
 declare const self: ServiceWorkerGlobalScope & typeof globalThis;
 
 clientsClaim();
+self.skipWaiting();
 
 cleanupOutdatedCaches();
 

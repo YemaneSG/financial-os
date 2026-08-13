@@ -55,12 +55,13 @@ failure/review state.
 | 2026-08-13 | Provisioned private network, Cloud SQL, evidence storage, Secret Manager, Artifact Registry, Cloud Tasks, scheduler, Cloud Run services/jobs, Firebase, monitoring, and the USD 50 monthly budget. | Pass |
 | 2026-08-13 | Bootstrapped least-privilege IAM database roles and applied the initial schema. Corrected an implicit-transaction defect that previously rolled back a nominally successful migration; final schema commit and idempotent rerun passed. | Pass |
 | 2026-08-13 | Registered exactly one Firebase owner and synchronized the stable provider subject to the encrypted allowlist and authorization table. Email is not the authorization key. | Pass |
-| 2026-08-13 | Published the installable PWA and changed Google authentication from popup to redirect for mobile/embedded-browser reliability. Updated CSP for the first-party Firebase auth iframe. | Pass |
+| 2026-08-13 | Published the installable PWA and changed Google authentication from popup to redirect. Updated CSP for the Firebase auth iframe. | Initial deployment passed; later cross-browser testing exposed a cross-origin redirect-state defect corrected below. |
 | 2026-08-13 | Verified live API 200/200 health, 404 production docs, 401 unauthenticated receipts, 404 direct worker, 100% API traffic, restored migration runner, and complete hosting headers. | Pass |
 | 2026-08-13 | Verified authenticated owner history query against the deployed API and Cloud SQL; clean first-run result contained zero receipts. | Pass |
 | 2026-08-13 | Final Terraform convergence plan. | Pass — no changes |
 | 2026-08-13 | Corrected Firebase root caching after an iPhone received the pre-release placeholder. Both hosting domains now return Financial OS with `no-cache, no-store, must-revalidate`; security headers were revalidated. | Pass |
 | 2026-08-13 | Diagnosed the first live HEIC attempt: the browser omitted `File.type`, creating a signed-header mismatch, and the `firebaseapp.com` alias was absent from bucket CORS. Deployed extension-based allowlisted MIME inference, exact signed/upload header matching, magic-byte MIME recording, a truthful HEIC preview fallback, retry-state clearing, and both exact Firebase origins. | Pass — 83 PWA tests, 84 backend tests, and live CORS preflights from both origins |
+| 2026-08-13 | Reproduced an endless Google sign-in spinner on Safari and Chrome when the app was opened on the `web.app` alias while Firebase redirect state used the `firebaseapp.com` auth domain. Canonicalized the alias before Firebase initialization, removed the app shell and registration script from service-worker precaching, enabled immediate worker activation, and forced worker control files to revalidate. | Pass — lint, type-check, 87 PWA tests, production build, private-data scan, live cache/security headers, and cached-client recovery from `web.app` to the authenticated capture screen with zero browser errors |
 
 ## Owner Gate C checklist
 

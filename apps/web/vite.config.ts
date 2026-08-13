@@ -16,8 +16,11 @@ export default defineConfig({
       injectManifest: {
         swSrc: "src/sw.ts",
         swDest: "dist/sw.js",
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-        globIgnores: ["**/node_modules/**"],
+        // Navigations are handled by the NetworkFirst route below. Pre-caching
+        // index.html lets an old worker pin an obsolete app shell and prevents
+        // urgent authentication fixes from reaching existing installations.
+        globPatterns: ["**/*.{js,css,svg,png,ico,woff2}"],
+        globIgnores: ["**/node_modules/**", "registerSW.js"],
       },
       devOptions: {
         enabled: false,
