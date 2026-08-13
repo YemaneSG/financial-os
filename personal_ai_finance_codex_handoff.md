@@ -579,8 +579,7 @@ Conceptually:
 
 ```python
 class ReceiptExtractor:
-    def extract(self, image) -> ReceiptExtraction:
-        ...
+    def extract(self, image) -> ReceiptExtraction: ...
 ```
 
 Do not scatter direct LLM API calls throughout the application.
@@ -1671,8 +1670,7 @@ Prefer:
 
 ```python
 class ReceiptExtractionService(Protocol):
-    def extract(self, image: ReceiptImage) -> ReceiptExtraction:
-        ...
+    def extract(self, image: ReceiptImage) -> ReceiptExtraction: ...
 ```
 
 Then implement adapters.

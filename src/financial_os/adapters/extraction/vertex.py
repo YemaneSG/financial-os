@@ -69,9 +69,7 @@ def _to_vertex_schema_node(node: dict[str, Any]) -> dict[str, Any]:
             converted["type"] = non_null_types[0]
             converted["nullable"] = "null" in value
         elif key in {"properties", "$defs"}:
-            converted[key] = {
-                name: _to_vertex_schema_node(child) for name, child in value.items()
-            }
+            converted[key] = {name: _to_vertex_schema_node(child) for name, child in value.items()}
         elif key in {"items", "additionalProperties"} and isinstance(value, dict):
             converted[key] = _to_vertex_schema_node(value)
         elif key == "anyOf":

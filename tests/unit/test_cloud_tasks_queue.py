@@ -8,10 +8,7 @@ from financial_os.domain.errors import QueueError
 
 def test_oidc_audience_uses_worker_service_origin() -> None:
     receipt_id = uuid4()
-    worker_url = (
-        "https://private-worker.example.run.app/"
-        f"internal/v1/receipts/{receipt_id}/process"
-    )
+    worker_url = f"https://private-worker.example.run.app/internal/v1/receipts/{receipt_id}/process"
 
     assert (
         CloudTasksQueueAdapter._oidc_audience(worker_url)

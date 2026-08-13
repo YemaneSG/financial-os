@@ -133,6 +133,7 @@ The `asset_manifest_hash` is computed deterministically from the finalized, veri
 ```python
 import hashlib, json
 
+
 def compute_asset_manifest_hash(verified_assets: list[dict]) -> str:
     """
     verified_assets: list of dicts with keys ordinal (int), object_key (str), sha256 (str).

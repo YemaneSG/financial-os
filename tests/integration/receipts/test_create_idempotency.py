@@ -6,6 +6,7 @@ must both return 2xx, and exactly one receipt row must exist.
 Requires DATABASE_URL env var pointing to a PostgreSQL instance.
 These tests are skipped automatically when DATABASE_URL is not set.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -106,9 +107,7 @@ async def app_module(session_factory):
 
 @pytest_asyncio.fixture(loop_scope="module")
 async def client(app_module):
-    async with AsyncClient(
-        transport=ASGITransport(app=app_module), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app_module), base_url="http://test") as c:
         yield c
 
 
@@ -185,9 +184,7 @@ class TestReceiptCreateIdempotency:
             "client_submission_key": str(uuid.uuid4()),
             "expected_asset_count": 2,
             "financial_context": "personal",
-            "assets": [
-                {"ordinal": 1, "declared_mime_type": "image/jpeg", "byte_size": 1000}
-            ],
+            "assets": [{"ordinal": 1, "declared_mime_type": "image/jpeg", "byte_size": 1000}],
         }
         response = await client.post("/api/v1/receipts", json=payload)
         assert response.status_code == 422

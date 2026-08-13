@@ -76,8 +76,7 @@ async def test_reconcile_redispatches_stale_queued_receipt() -> None:
     attempt = next(value for value in session.added if isinstance(value, ProcessingAttempt))
     assert attempt.attempt_number == 4
     assert any(
-        isinstance(event, StateEvent)
-        and event.reason_code == "reconcile_queued_re_enqueue"
+        isinstance(event, StateEvent) and event.reason_code == "reconcile_queued_re_enqueue"
         for event in session.added
     )
 
@@ -96,8 +95,7 @@ async def test_reconcile_flags_stale_queued_receipt_when_redispatch_fails() -> N
     assert result.re_enqueued_count == 0
     assert result.flagged_count == 1
     assert any(
-        isinstance(event, StateEvent)
-        and event.reason_code == "reconcile_queued_dispatch_failed"
+        isinstance(event, StateEvent) and event.reason_code == "reconcile_queued_dispatch_failed"
         for event in session.added
     )
 
