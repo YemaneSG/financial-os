@@ -1,0 +1,72 @@
+{
+  "_comment": "Synthetic multi-page extraction result fixture. Used in unit and contract tests. No real receipt data.",
+  "schema_version": "v1",
+  "merchant_raw": "SYNTHETIC HARDWARE STORE",
+  "merchant_normalized": "Synthetic Hardware Store",
+  "purchase_datetime_raw": "2026-02-20T14:15:00",
+  "purchase_datetime": "2026-02-20T14:15:00Z",
+  "currency": "USD",
+  "subtotal_minor": 8999,
+  "tax_minor": 720,
+  "tip_minor": null,
+  "discount_minor": 500,
+  "total_minor": 9219,
+  "overall_confidence": 0.88,
+  "line_items": [
+    {
+      "ordinal": 1,
+      "raw_description": "POWER DRILL 20V",
+      "normalized_description": "Power Drill 20V",
+      "quantity": "1",
+      "unit": "each",
+      "unit_price_decimal": "59.99",
+      "line_total_minor": 5999,
+      "discount_minor": 500,
+      "category_suggestion": "home_improvement"
+    },
+    {
+      "ordinal": 2,
+      "raw_description": "DRILL BIT SET 15PC",
+      "normalized_description": "Drill Bit Set 15-Piece",
+      "quantity": "1",
+      "unit": "set",
+      "unit_price_decimal": "15.00",
+      "line_total_minor": 1500,
+      "discount_minor": null,
+      "category_suggestion": "home_improvement"
+    },
+    {
+      "ordinal": 3,
+      "raw_description": "SANDPAPER 120 GRIT 5PK",
+      "normalized_description": "Sandpaper 120 Grit 5-Pack",
+      "quantity": "3",
+      "unit": "pack",
+      "unit_price_decimal": "5.00",
+      "line_total_minor": 1500,
+      "discount_minor": null,
+      "category_suggestion": "home_improvement"
+    }
+  ],
+  "validation_findings": [
+    {
+      "check_code": "TOTALS_ARITHMETIC_V1",
+      "outcome": "pass",
+      "rule_version": "v1"
+    },
+    {
+      "check_code": "LINE_ITEMS_SUM_V1",
+      "outcome": "warn",
+      "rule_version": "v1"
+    }
+  ],
+  "provider_metadata": {
+    "provider": "vertex-ai",
+    "model_id": "gemini-2.0-flash-001",
+    "prompt_version": "v1",
+    "schema_version": "v1",
+    "input_tokens": 1024,
+    "output_tokens": 512,
+    "latency_ms": 2200,
+    "estimated_cost_cents": 2
+  }
+}

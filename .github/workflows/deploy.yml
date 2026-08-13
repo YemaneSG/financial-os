@@ -1,0 +1,236 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev]
+
+permissions:
+  contents: read
+  id-token: write  # Required for WIF OIDC token issuance (CICD-01).
+
+env:
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+  # IMAGE_REPO is set per-environment below via env step.
+
+jobs:
+  deploy:
+    name: Build → Migrate → Deploy → Smoke test
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    concurrency:
+      group: deploy-${{ github.event.inputs.environment || 'dev' }}
+      cancel-in-progress: false  # Never cancel an in-flight deploy; queue instead.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── 1. Authenticate with GCP via WIF (no service-account key) ──────────
+      - name: Authenticate to GCP (WIF)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      # ── 2. Build and push immutable image ──────────────────────────────────
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          # Both a mutable tag (git SHA) and an immutable digest are produced.
+          # Deploy steps below use ONLY the digest (CICD-03).
+          tags: |
+            ${{ env.REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/financial-os/app:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/financial-os/app:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/financial-os/app:buildcache,mode=max
+          provenance: false  # Simplify digest computation.
+
+      - name: Resolve immutable image digest
+        id: image
+        run: |
+          DIGEST="${{ steps.build.outputs.digest }}"
+          IMAGE_REF="${{ env.REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/financial-os/app@${DIGEST}"
+          echo "ref=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Deploying image ${IMAGE_REF}"
+
+      # ── 3. Run migration job (one-shot, must exit 0 before traffic) ────────
+      - name: Update migration job image
+        run: |
+          gcloud run jobs update financial-os-${{ github.event.inputs.environment || 'dev' }}-migrate \
+            --image="${{ steps.image.outputs.ref }}" \
+            --region="${{ env.REGION }}" \
+            --quiet
+
+      - name: Execute migration job
+        run: |
+          gcloud run jobs execute financial-os-${{ github.event.inputs.environment || 'dev' }}-migrate \
+            --region="${{ env.REGION }}" \
+            --wait \
+            --quiet
+          # --wait blocks until completion; non-zero exit stops this deploy.
+
+      # ── 4. Deploy API revision (no traffic yet) ────────────────────────────
+      - name: Deploy tagged API candidate (--no-traffic)
+        id: deploy_api
+        run: |
+          gcloud run deploy financial-os-${{ github.event.inputs.environment || 'dev' }}-api \
+            --image="${{ steps.image.outputs.ref }}" \
+            --region="${{ env.REGION }}" \
+            --no-traffic \
+            --tag=candidate \
+            --quiet
+          REVISION=$(gcloud run revisions list \
+            --service="financial-os-${{ github.event.inputs.environment || 'dev' }}-api" \
+            --region="${{ env.REGION }}" \
+            --sort-by="~metadata.creationTimestamp" \
+            --limit=1 \
+            --format="value(metadata.name)")
+          CANDIDATE_URL=$(gcloud run services describe \
+            financial-os-${{ github.event.inputs.environment || 'dev' }}-api \
+            --region="${{ env.REGION }}" \
+            --format=json | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
+          test -n "${CANDIDATE_URL}"
+          echo "revision=${REVISION}" >> "$GITHUB_OUTPUT"
+          echo "candidate_url=${CANDIDATE_URL}" >> "$GITHUB_OUTPUT"
+
+      # ── 5. Deploy worker revision (no traffic yet) ─────────────────────────
+      - name: Deploy worker revision (--no-traffic)
+        id: deploy_worker
+        run: |
+          gcloud run deploy financial-os-${{ github.event.inputs.environment || 'dev' }}-worker \
+            --image="${{ steps.image.outputs.ref }}" \
+            --region="${{ env.REGION }}" \
+            --no-traffic \
+            --quiet
+          REVISION=$(gcloud run revisions list \
+            --service="financial-os-${{ github.event.inputs.environment || 'dev' }}-worker" \
+            --region="${{ env.REGION }}" \
+            --sort-by="~metadata.creationTimestamp" \
+            --limit=1 \
+            --format="value(metadata.name)")
+          echo "revision=${REVISION}" >> "$GITHUB_OUTPUT"
+
+      # ── 6. Smoke test new revisions before switching traffic ───────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Smoke test API revision
+        run: |
+          python scripts/smoke-test.py \
+            --revision-url "${{ steps.deploy_api.outputs.candidate_url }}" \
+            --path /health/ready
+
+      # ── 7. Switch traffic to new revisions ────────────────────────────────
+      - name: Switch API traffic to new revision
+        run: |
+          gcloud run services update-traffic \
+            financial-os-${{ github.event.inputs.environment || 'dev' }}-api \
+            --region="${{ env.REGION }}" \
+            --to-revisions="${{ steps.deploy_api.outputs.revision }}=100" \
+            --quiet
+          gcloud run services update-traffic \
+            financial-os-${{ github.event.inputs.environment || 'dev' }}-api \
+            --region="${{ env.REGION }}" \
+            --remove-tags=candidate \
+            --quiet
+
+      - name: Switch worker traffic to new revision
+        run: |
+          gcloud run services update-traffic \
+            financial-os-${{ github.event.inputs.environment || 'dev' }}-worker \
+            --region="${{ env.REGION }}" \
+            --to-revisions="${{ steps.deploy_worker.outputs.revision }}=100" \
+            --quiet
+
+      # ── 8. Record deployment evidence (CICD-03) ────────────────────────────
+      - name: Record deployment evidence
+        if: always()
+        run: |
+          echo "=== DEPLOYMENT RECORD ===" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Commit:** ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image digest:** ${{ steps.image.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image ref:** ${{ steps.image.outputs.ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **API revision:** ${{ steps.deploy_api.outputs.revision }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Worker revision:** ${{ steps.deploy_worker.outputs.revision }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Environment:** ${{ github.event.inputs.environment || 'dev' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Actor:** ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Post-deploy: Firebase Hosting ────────────────────────────────────────
+  deploy-hosting:
+    name: Deploy Firebase Hosting
+    runs-on: ubuntu-latest
+    needs: deploy
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build PWA
+        run: pnpm build
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          VITE_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+
+      - name: Authenticate to GCP (WIF)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Firebase Hosting
+        run: >-
+          pnpm dlx firebase-tools@14.13.0 deploy
+          --only hosting
+          --non-interactive
+          --config infra/hosting/firebase.json
+          --project "${{ vars.FIREBASE_PROJECT_ID }}"
+
+      # Verify security headers on the deployed site (S-02, CICD-02).
+      - name: Verify deployed security headers
+        run: bash scripts/validate-headers.sh "${{ vars.HOSTING_URL }}"

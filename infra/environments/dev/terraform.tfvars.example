@@ -1,0 +1,39 @@
+# Copy to terraform.tfvars and fill in real values.
+# NEVER commit terraform.tfvars (contains project identifiers).
+# NEVER put real GCP project IDs, service account emails, or billing account
+# IDs in any file that enters the public repository.
+
+project_id     = "your-gcp-project-id"
+project_number = "123456789012"
+region         = "us-central1"
+environment    = "dev"
+
+gcs_location         = "US"
+evidence_bucket_name = "your-project-id-financial-os-evidence-dev"
+cors_origin          = "https://your-project.web.app"
+
+# VPC: use the default network for dev, create a dedicated VPC for production.
+vpc_network_id = "projects/your-gcp-project-id/global/networks/default"
+vpc_network_name    = "default"
+vpc_subnetwork_name = "default"
+
+sql_tier              = "db-g1-small"
+sql_availability_type = "ZONAL"
+
+github_org  = "your-github-org"
+github_repo = "FinancialOs"
+
+# Replace after the phase-one registry bootstrap. The all-zero digest is an
+# intentionally non-deployable placeholder that keeps targeted planning safe.
+initial_image = "us-central1-docker.pkg.dev/your-gcp-project-id/financial-os/app@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+# Leave as 0 unless A-04 cold-start evidence shows 10s capture target is at risk.
+api_min_instances = 0
+api_max_instances = 5
+worker_max_instances = 3
+
+alert_email = "your-alert-email@example.com"
+
+# Billing account: find with `gcloud billing accounts list`
+billing_account    = "XXXXXX-XXXXXX-XXXXXX"
+monthly_budget_usd = 50

@@ -48,13 +48,14 @@ apps/
   api/                   # FastAPI entry point (public API)
 
 src/financial_os/
-  domain/                # entities, values, states, invariants
-  application/           # use cases and ports
+  domain/                # values, states, errors, invariants
+  models/                # SQLAlchemy persistence models
+  services/              # receipt and worker use cases
+  schemas/               # HTTP and extraction schemas
   adapters/              # auth, database, extraction, queue, storage, observability
-  delivery/
-    http/                # public API routes and schemas
-    worker/              # private task handlers
-  config/
+  auth/                  # owner JWT and internal OIDC verification
+  routers/               # public API, health, and private worker routes
+  config.py              # validated environment configuration
 
 tests/
   unit/
@@ -85,14 +86,18 @@ pip install -e ".[dev]"
 # Database migrations (after Postgres is running)
 alembic upgrade head
 
-# Frontend
-cd apps/web && npm install && npm run dev
+# Frontend (from the repository root)
+corepack enable
+pnpm install --frozen-lockfile
+pnpm dev
 
 # API (development)
-uvicorn financial_os.delivery.http.app:app --reload
+uvicorn apps.api.main:app --reload
 ```
 
 Copy `.env.example` to `.env` and fill in the required values. Never commit `.env`.
+
+Personal cloud setup: [`docs/operations/personal-gcp-bootstrap.md`](docs/operations/personal-gcp-bootstrap.md)
 
 ---
 

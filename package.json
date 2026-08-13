@@ -3,22 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "description": "Financial OS — root workspace",
+  "packageManager": "pnpm@11.19.0",
   "workspaces": [
     "apps/web"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/web",
-    "test": "npm run test --workspace=apps/web",
-    "test:e2e": "npm run test:e2e --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web",
-    "type-check": "npm run type-check --workspace=apps/web"
+    "dev": "pnpm --filter @financial-os/web dev",
+    "build": "pnpm --filter @financial-os/web build",
+    "test": "pnpm --filter @financial-os/web test",
+    "test:e2e": "pnpm --filter @financial-os/web test:e2e",
+    "lint": "pnpm --filter @financial-os/web lint",
+    "type-check": "pnpm --filter @financial-os/web type-check"
   },
   "devDependencies": {
     "typescript": "~5.5.0"
   },
   "engines": {
     "node": ">=20.0.0",
-    "npm": ">=10.0.0"
+    "pnpm": ">=11.0.0"
   }
 }

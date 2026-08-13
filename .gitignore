@@ -14,7 +14,7 @@ gcloud-key*.json
 # Real receipt images, extracted content, statements, transactions, pay stubs
 data/raw/
 data/private/
-receipts/
+/receipts/
 *.receipt.json
 *.statement.csv
 *.statement.pdf
@@ -51,6 +51,7 @@ coverage.xml
 
 # ── Node / TypeScript / Vite ──────────────────────────────────────────────────
 node_modules/
+.pnpm-store/
 apps/web/dist/
 apps/web/.vite/
 apps/web/coverage/
