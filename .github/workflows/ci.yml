@@ -11,7 +11,7 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
 
 jobs:
   # ── Backend: lint, type-check, unit + integration tests ───────────────────
@@ -248,10 +248,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate OpenAPI contract
-        uses: swaggerhub-wap/openapi-spec-validator-action@v1.1.0
+      - uses: actions/setup-python@v5
         with:
-          openapi-spec: contracts/openapi.yaml
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install OpenAPI validator
+        run: pip install "openapi-spec-validator==0.9.0"
+
+      - name: Validate OpenAPI contract
+        run: openapi-spec-validator contracts/openapi.yaml
 
   # ── Container: build (no push on PRs) ────────────────────────────────────
   container-build:
