@@ -3,11 +3,12 @@
 **Status:** Approved baseline  
 **Owner:** Yemane  
 **Created:** August 12, 2026  
-**Last updated:** August 12, 2026
+**Last updated:** August 13, 2026
+**Approved product name:** **DollarTrace** (rename implementation deferred; see `open-items-and-decisions.md`)
 
 ## 1. Purpose
 
-This document defines the product requirements for Financial OS. It is intentionally model-agnostic: any human contributor or AI-assisted development tool should be able to understand the product, its accepted decisions, its constraints, and its unresolved questions from the repository documentation.
+This document defines the product requirements for DollarTrace, previously developed under the working name Financial OS. It is intentionally model-agnostic: any human contributor or AI-assisted development tool should be able to understand the product, its accepted decisions, its constraints, and its unresolved questions from the repository documentation.
 
 This is a living document while product discovery is in progress. Accepted requirements are distinguished from preliminary recommendations and open decisions.
 

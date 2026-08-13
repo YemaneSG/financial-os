@@ -127,6 +127,7 @@ Development uses a formal AI-assisted operating model with bounded execution pac
 
 - Operating model: [`docs/governance/ai-development-operating-model.md`](docs/governance/ai-development-operating-model.md)
 - Agent contributor guide: [`AGENTS.md`](AGENTS.md)
+- Open items and accepted decisions: [`docs/product/open-items-and-decisions.md`](docs/product/open-items-and-decisions.md)
 - Requirements traceability: [`docs/product/requirements-traceability.md`](docs/product/requirements-traceability.md)
 
 ---

@@ -13,7 +13,7 @@
 | Tier | Documents | Status |
 |---|---|---|
 | 1 — Security floor | `docs/security/control-baseline.md` MUST controls | Release blocking; may never be silently waived |
-| 2 — Product contract | `docs/product/PRD.md`, `docs/product/roadmap.md` | Authoritative scope and outcomes |
+| 2 — Product contract | `docs/product/PRD.md`, `docs/product/roadmap.md`, `docs/product/open-items-and-decisions.md` | Authoritative scope, outcomes, accepted decisions, and open items |
 | 3 — Architecture contract | `docs/architecture/system-architecture.md`, `docs/architecture/data-architecture.md`, `docs/architecture/technology-recommendation.md` | Authoritative design and data model |
 | 4 — Implementation contract | `docs/implementation/execution-packets/sprint-0-1-receipt-capture.md`, `docs/architecture/implementation-contracts.md` | Authoritative for Wave 1 build |
 | 5 — Governance | `docs/governance/ai-development-operating-model.md` | Authoritative for process and roles |

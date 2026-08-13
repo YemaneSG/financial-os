@@ -5,6 +5,7 @@ This directory contains the model-agnostic operating rules for AI-assisted produ
 ## Canonical project policy
 
 - `ai-development-operating-model.md` — approved Financial OS roles, evidence rules, review protocol, quality gates, and orchestration strategy
+- `../product/open-items-and-decisions.md` — accepted owner decisions, deferred work, execution gates, and completion evidence
 
 ## Reusable templates
 
