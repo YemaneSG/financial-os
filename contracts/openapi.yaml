@@ -1,0 +1,1072 @@
+openapi: "3.1.0"
+
+info:
+  title: Financial OS API
+  version: "1.0.0"
+  description: |
+    Private single-owner receipt-capture API.
+
+    All `/api/v1/` routes require a Firebase-issued Bearer token for the
+    allowlisted owner identity (IAM-01, IAM-02).
+
+    All `/internal/v1/` routes accept only Cloud Tasks OIDC-authenticated
+    requests with the correct audience (QUE-01). They must not be reachable
+    from the public internet.
+
+    Changes to this contract after Wave 1 require supervisor approval,
+    impact analysis, and affected-agent notification.
+  contact:
+    name: Financial OS — supervisor
+  x-wave: "1"
+  x-baseline: "planning-baseline-2026-08-12-r1"
+
+servers:
+  - url: https://api.example.invalid
+    description: >
+      Placeholder. Real server URL is a non-public Cloud Run service URL
+      managed through Secret Manager and never committed to this file.
+
+tags:
+  - name: receipts
+    description: Receipt lifecycle — creation, upload, finalization, and retrieval
+  - name: worker
+    description: >
+      Internal processing endpoints — authenticated Cloud Tasks delivery only.
+      Not reachable from the public internet.
+  - name: health
+    description: Liveness and readiness probes
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase JWT (Google identity, server-validated, owner allowlist enforced)
+    CloudTasksOIDC:
+      type: http
+      scheme: bearer
+      bearerFormat: >
+        Google OIDC JWT issued by Cloud Tasks service account.
+        Audience must match the worker service URL. Validated server-side.
+
+  schemas:
+
+    # ── Shared primitives ─────────────────────────────────────────────────────
+
+    UUID:
+      type: string
+      format: uuid
+      description: Version 4 UUID in lowercase canonical form (8-4-4-4-12).
+      example: "a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5"
+
+    Timestamp:
+      type: string
+      format: date-time
+      description: UTC timestamp in RFC 3339 format.
+      example: "2026-08-12T14:30:00.000Z"
+
+    Currency:
+      type: string
+      minLength: 3
+      maxLength: 3
+      pattern: "^[A-Z]{3}$"
+      description: ISO 4217 currency code.
+      example: "USD"
+
+    MinorUnits:
+      type:
+        - integer
+        - "null"
+      description: >
+        Currency amount in minor units (e.g. cents for USD).
+        Always an integer; never a float. Null when not evidenced.
+      example: 1099
+
+    # ── Processing and verification states ────────────────────────────────────
+
+    ProcessingStatus:
+      type: string
+      enum:
+        - reserved
+        - uploading
+        - uploaded
+        - queued
+        - processing
+        - extracted
+        - retryable_failed
+        - failed
+        - abandoned
+      description: |
+        Internal processing lifecycle. Public API may collapse early states
+        into simpler language but never implies completion that has not occurred.
+
+        State machine:
+          reserved → uploading → uploaded → queued → processing → extracted
+                                                                ↘ retryable_failed → queued
+                                                                ↘ failed
+          reserved | uploading → abandoned (reconciliation sweep only)
+
+    VerificationStatus:
+      type: string
+      enum:
+        - unreviewed
+        - system_validated
+        - needs_review
+        - human_verified
+      description: >
+        Independent trust dimension. Processing and verification states advance
+        independently. No automated process sets human_verified.
+
+    FinancialContext:
+      type: string
+      enum:
+        - personal
+        - rental_property
+      description: >
+        Coarse financial context. Defaults to personal. rental_property is
+        available for exclusion from personal behavior aggregates; full
+        property modeling is deferred.
+
+    UploadStatus:
+      type: string
+      enum:
+        - reserved
+        - uploaded
+        - verified
+        - rejected
+
+    # ── Asset schemas ─────────────────────────────────────────────────────────
+
+    AssetInput:
+      type: object
+      required:
+        - ordinal
+        - declared_mime_type
+        - byte_size
+      properties:
+        ordinal:
+          type: integer
+          minimum: 1
+          description: 1-based position of this image in the ordered receipt.
+        declared_mime_type:
+          type: string
+          description: >
+            Client-declared MIME type. Server treats this as a claim only.
+            Verified server-side at finalization (OBJ-03).
+          example: "image/jpeg"
+        byte_size:
+          type: integer
+          minimum: 1
+          maximum: 10485760
+          description: Declared byte size. Server verifies at finalization.
+
+    UploadCapability:
+      type: object
+      required:
+        - asset_id
+        - ordinal
+        - upload_url
+        - method
+        - expires_at
+        - allowed_mime_types
+      properties:
+        asset_id:
+          $ref: "#/components/schemas/UUID"
+        ordinal:
+          type: integer
+          minimum: 1
+        upload_url:
+          type: string
+          format: uri
+          description: >
+            Short-lived server-selected signed URL for direct PUT upload to
+            private object storage. This is a bearer secret — never log,
+            cache, or emit in analytics (OBJ-02, LOG-01).
+        method:
+          type: string
+          enum: ["PUT"]
+        expires_at:
+          $ref: "#/components/schemas/Timestamp"
+        allowed_mime_types:
+          type: array
+          items:
+            type: string
+          description: MIME types accepted at this upload path.
+
+    AssetSummary:
+      type: object
+      required:
+        - asset_id
+        - ordinal
+        - upload_status
+      properties:
+        asset_id:
+          $ref: "#/components/schemas/UUID"
+        ordinal:
+          type: integer
+          minimum: 1
+        upload_status:
+          $ref: "#/components/schemas/UploadStatus"
+        verified_mime_type:
+          type:
+            - string
+            - "null"
+        byte_size:
+          type:
+            - integer
+            - "null"
+
+    # ── Revision / extraction output schemas ──────────────────────────────────
+
+    LineItemSummary:
+      type: object
+      required:
+        - ordinal
+        - raw_description
+      properties:
+        ordinal:
+          type: integer
+          minimum: 1
+        raw_description:
+          type: string
+        normalized_description:
+          type:
+            - string
+            - "null"
+        quantity:
+          type:
+            - string
+            - "null"
+          description: Decimal quantity as a string to avoid float loss.
+          example: "2.5"
+        unit:
+          type:
+            - string
+            - "null"
+        unit_price_decimal:
+          type:
+            - string
+            - "null"
+          description: Unit price as decimal string; used when precision exceeds minor units.
+          example: "3.99"
+        line_total_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        discount_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        category_suggestion:
+          type:
+            - string
+            - "null"
+          description: Non-authoritative category suggestion from the extractor.
+
+    ValidationFindingSummary:
+      type: object
+      required:
+        - check_code
+        - outcome
+      properties:
+        check_code:
+          type: string
+          description: Versioned deterministic rule identifier.
+          example: "TOTALS_ARITHMETIC_V1"
+        outcome:
+          type: string
+          enum: [pass, warn, fail, not_applicable]
+        rule_version:
+          type: string
+
+    RevisionSummary:
+      type: object
+      properties:
+        revision_id:
+          $ref: "#/components/schemas/UUID"
+        source_type:
+          type: string
+          enum: [extractor, human, import]
+        merchant_normalized:
+          type:
+            - string
+            - "null"
+        purchase_datetime:
+          type:
+            - string
+            - "null"
+          format: date-time
+        currency:
+          $ref: "#/components/schemas/Currency"
+        subtotal_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        tax_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        tip_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        discount_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        total_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        overall_confidence:
+          type:
+            - number
+            - "null"
+          minimum: 0
+          maximum: 1
+
+    # ── Receipt schemas ───────────────────────────────────────────────────────
+
+    ReceiptListItem:
+      type: object
+      required:
+        - receipt_id
+        - processing_status
+        - verification_status
+        - financial_context
+        - expected_asset_count
+        - created_at
+      properties:
+        receipt_id:
+          $ref: "#/components/schemas/UUID"
+        processing_status:
+          $ref: "#/components/schemas/ProcessingStatus"
+        verification_status:
+          $ref: "#/components/schemas/VerificationStatus"
+        financial_context:
+          $ref: "#/components/schemas/FinancialContext"
+        expected_asset_count:
+          type: integer
+          minimum: 1
+        acknowledged_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        current_revision:
+          oneOf:
+            - $ref: "#/components/schemas/RevisionSummary"
+            - type: "null"
+
+    ReceiptDetail:
+      allOf:
+        - $ref: "#/components/schemas/ReceiptListItem"
+        - type: object
+          properties:
+            assets:
+              type: array
+              items:
+                $ref: "#/components/schemas/AssetSummary"
+            line_items:
+              type:
+                - array
+                - "null"
+              items:
+                $ref: "#/components/schemas/LineItemSummary"
+            validation_findings:
+              type:
+                - array
+                - "null"
+              items:
+                $ref: "#/components/schemas/ValidationFindingSummary"
+            safe_error_code:
+              type:
+                - string
+                - "null"
+              description: >
+                Non-sensitive failure classification code. Present only when
+                the last processing attempt failed. Never contains receipt
+                content or provider raw output.
+            provenance_summary:
+              type:
+                - object
+                - "null"
+              description: >
+                Safe extraction provenance (provider name, model ID, prompt
+                version, schema version, attempt count). Never contains
+                credentials, prompt text, or raw model output.
+              properties:
+                provider:
+                  type: string
+                model_id:
+                  type: string
+                prompt_version:
+                  type: string
+                schema_version:
+                  type: string
+                attempt_count:
+                  type: integer
+
+    # ── Error schema ─────────────────────────────────────────────────────────
+
+    ApiError:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          description: >
+            Stable machine-readable error code. Never contains receipt
+            content, credentials, or internal identifiers.
+          example: "RECEIPT_NOT_FOUND"
+        message:
+          type: string
+          description: Human-readable message safe for display. No private detail.
+        request_id:
+          type:
+            - string
+            - "null"
+          description: Trace/correlation ID for support reference.
+
+  responses:
+    Unauthorized:
+      description: >
+        Missing or invalid Bearer token. Response contains no private detail.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            error_code: "UNAUTHORIZED"
+            message: "Authentication required."
+
+    Forbidden:
+      description: >
+        Valid token for a non-allowlisted identity, or session version mismatch.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            error_code: "FORBIDDEN"
+            message: "Access denied."
+
+    NotFound:
+      description: Receipt or asset not found for this owner.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            error_code: "RECEIPT_NOT_FOUND"
+            message: "Receipt not found."
+
+    UnprocessableEntity:
+      description: Request schema validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+    Conflict:
+      description: >
+        State conflict (e.g., receipt already finalized, retry not permitted).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit resets.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+paths:
+
+  # ── Public receipt routes ─────────────────────────────────────────────────
+
+  /api/v1/receipts:
+    post:
+      operationId: createReceipt
+      summary: Create a receipt and obtain upload capabilities
+      description: |
+        Creates a new receipt and returns short-lived signed upload URLs for
+        each declared asset (OBJ-02).
+
+        **Idempotency (A-01):** The `client_submission_key` is a Version 4 UUID
+        generated by the client using `crypto.randomUUID()` before this call.
+        If a receipt with the same `client_submission_key` already exists for
+        this owner, the existing receipt and new upload capabilities are returned
+        with HTTP 200. Both concurrent callers receive a 2xx; only one receipt
+        is created. Test: two concurrent POSTs → two 2xx, one receipt.
+
+        **Key must be unique per owner.** Do not reuse a key for a different
+        receipt; the server returns the original receipt without creating a new one.
+
+        **Upload capabilities** are bearer secrets with narrow object scope and
+        short expiry. Never log, cache in service-worker, or include in analytics.
+      tags: [receipts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - client_submission_key
+                - expected_asset_count
+                - assets
+              properties:
+                client_submission_key:
+                  $ref: "#/components/schemas/UUID"
+                  description: >
+                    Client-generated Version 4 UUID. Must be produced by
+                    `crypto.randomUUID()` (Web Crypto API) in a secure context
+                    before this request is sent. Never reuse across receipts.
+                expected_asset_count:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  description: Total number of images in this receipt.
+                financial_context:
+                  $ref: "#/components/schemas/FinancialContext"
+                  default: personal
+                captured_at:
+                  type:
+                    - string
+                    - "null"
+                  format: date-time
+                  description: >
+                    Client-reported capture time when reliably known.
+                    Optional; stored as provided without invention of timezone.
+                assets:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    $ref: "#/components/schemas/AssetInput"
+                  description: >
+                    Ordered asset declarations. Length must match
+                    `expected_asset_count`. Ordinals must be contiguous
+                    starting from 1.
+      responses:
+        "201":
+          description: Receipt created. Upload capabilities returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - receipt_id
+                  - processing_status
+                  - upload_capabilities
+                properties:
+                  receipt_id:
+                    $ref: "#/components/schemas/UUID"
+                  processing_status:
+                    $ref: "#/components/schemas/ProcessingStatus"
+                  upload_capabilities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UploadCapability"
+        "200":
+          description: >
+            Receipt already exists for this `client_submission_key` and owner.
+            Fresh upload capabilities are returned. Idempotent replay.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - receipt_id
+                  - processing_status
+                  - upload_capabilities
+                properties:
+                  receipt_id:
+                    $ref: "#/components/schemas/UUID"
+                  processing_status:
+                    $ref: "#/components/schemas/ProcessingStatus"
+                  upload_capabilities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UploadCapability"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    get:
+      operationId: listReceipts
+      summary: List receipts for the authenticated owner
+      description: |
+        Returns receipts ordered newest first. Each row includes current
+        processing/verification status and a current revision summary when available.
+
+        This is not an analytics dashboard. Pagination uses an opaque cursor.
+      tags: [receipts]
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type:
+              - string
+              - "null"
+          description: Opaque pagination cursor from a previous response.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+          description: Maximum receipts to return.
+      responses:
+        "200":
+          description: List of receipts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - receipts
+                properties:
+                  receipts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReceiptListItem"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+                    description: Cursor for the next page. Null when no more results.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/receipts/{receipt_id}:
+    get:
+      operationId: getReceipt
+      summary: Get receipt detail including ordered evidence and current revision
+      tags: [receipts]
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Full receipt detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/receipts/{receipt_id}/finalize:
+    post:
+      operationId: finalizeReceipt
+      summary: Verify uploaded evidence and durably acknowledge the receipt
+      description: |
+        Verifies that all declared assets are present in private storage with
+        matching object metadata (OBJ-03), persists durable receipt state, and
+        enqueues an authenticated processing task (API-03, QUE-01).
+
+        The response is sent only after evidence and receipt state are durable
+        and the receipt is eligible for deterministic re-enqueue even if the
+        first task dispatch fails. "Receipt saved" is never claimed without this.
+
+        **Idempotency:** Safe to retry. A receipt already in `queued` or later
+        state returns 200 without re-enqueuing. A receipt with evidence missing
+        or invalid returns 422.
+
+        **Verification steps (OBJ-03):** object existence, owner/receipt path
+        match, ordered count, byte size within limits, allowed MIME type,
+        decodable image content, `storage_generation` recorded.
+      tags: [receipts]
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: No required body fields. Reserved for future finalization hints.
+      responses:
+        "200":
+          description: Receipt acknowledged. Processing queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - receipt_id
+                  - processing_status
+                  - acknowledged_at
+                properties:
+                  receipt_id:
+                    $ref: "#/components/schemas/UUID"
+                  processing_status:
+                    $ref: "#/components/schemas/ProcessingStatus"
+                  acknowledged_at:
+                    $ref: "#/components/schemas/Timestamp"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          description: Evidence set is incomplete or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error_code: "EVIDENCE_INCOMPLETE"
+                message: "One or more expected images are missing or could not be verified."
+
+  /api/v1/receipts/{receipt_id}/retry-processing:
+    post:
+      operationId: retryProcessing
+      summary: Re-enqueue a receipt for extraction after a retryable failure
+      description: |
+        Permitted only when the receipt's processing status is `retryable_failed`
+        or `failed` (with supervisor approval). Creates a new processing attempt
+        and re-enqueues. Idempotent: a receipt already in `queued` or `processing`
+        returns 200 without creating a duplicate task.
+      tags: [receipts]
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Receipt re-queued for processing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - receipt_id
+                  - processing_status
+                properties:
+                  receipt_id:
+                    $ref: "#/components/schemas/UUID"
+                  processing_status:
+                    $ref: "#/components/schemas/ProcessingStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Retry not permitted for the current processing status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error_code: "RETRY_NOT_PERMITTED"
+                message: "Receipt is not in a retryable state."
+
+  /api/v1/receipts/{receipt_id}/assets/{asset_id}/download:
+    post:
+      operationId: getAssetDownloadCapability
+      summary: Obtain a short-lived capability to download a receipt asset
+      description: |
+        Returns a short-lived server-authorized download URL for a specific
+        receipt asset. The URL provides authenticated access to private object
+        storage without making the bucket public (SEC-002, OBJ-01).
+
+        The returned URL is a bearer secret — never log, include in analytics,
+        or cache in a service worker. It must be used immediately for image
+        display and discarded.
+      tags: [receipts]
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Short-lived download capability.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - download_url
+                  - method
+                  - expires_at
+                properties:
+                  download_url:
+                    type: string
+                    format: uri
+                    description: >
+                      Short-lived signed URL. Bearer secret — never log
+                      or cache (OBJ-02, LOG-01).
+                  method:
+                    type: string
+                    enum: ["GET"]
+                  expires_at:
+                    $ref: "#/components/schemas/Timestamp"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Internal worker routes ─────────────────────────────────────────────────
+
+  /internal/v1/receipts/{receipt_id}/process:
+    post:
+      operationId: processReceipt
+      summary: >
+        [INTERNAL] Execute extraction and validation for one receipt.
+        Cloud Tasks delivery only.
+      description: |
+        This endpoint is not reachable from the public internet (NET-01, QUE-01).
+        It accepts only authenticated OIDC requests from the Cloud Tasks service
+        account with the correct audience.
+
+        Worker behavior:
+        1. Validate the OIDC token audience.
+        2. Acquire an idempotent processing lease (optimistic lock on the attempt row).
+        3. Read ordered assets by recorded `storage_generation` (S-01).
+        4. Verify EXIF-strip and produce sanitized processing derivatives.
+        5. Invoke `ReceiptExtractor.extract()` with bounded input ceilings (see
+           `implementation-contracts.md` §6).
+        6. Validate extraction output against the versioned JSON Schema and
+           deterministic arithmetic checks.
+        7. Commit extraction run, immutable revision, line items, validation
+           findings, and state transition atomically.
+        8. Classify failures as `retryable_failed` or `failed`.
+
+        Returns 200 for both success and expected terminal failures; returning
+        non-200 causes Cloud Tasks to retry the delivery.
+      tags: [worker]
+      security:
+        - CloudTasksOIDC: []
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pipeline_version
+                - attempt_number
+              properties:
+                pipeline_version:
+                  type: string
+                  description: Code/config version tag recorded per run.
+                attempt_number:
+                  type: integer
+                  minimum: 1
+                  description: Delivery attempt number from the queue.
+                task_name:
+                  type:
+                    - string
+                    - "null"
+                  description: Cloud Tasks task name for idempotency logging.
+      responses:
+        "200":
+          description: >
+            Processing attempt completed (success, retryable failure, or
+            terminal failure). The outcome is recorded in the database.
+            Non-200 causes Cloud Tasks retry — only return non-200 for
+            transient infrastructure failures.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - receipt_id
+                  - outcome
+                properties:
+                  receipt_id:
+                    $ref: "#/components/schemas/UUID"
+                  outcome:
+                    type: string
+                    enum:
+                      - succeeded
+                      - retryable_failed
+                      - terminal_failed
+                  safe_error_code:
+                    type:
+                      - string
+                      - "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /internal/v1/reconcile-processing:
+    post:
+      operationId: reconcileProcessing
+      summary: >
+        [INTERNAL] Stale-work reconciliation sweep.
+        Cloud Scheduler delivery only.
+      description: |
+        This endpoint is not reachable from the public internet (NET-01).
+        Triggered by Cloud Scheduler on a configurable interval.
+
+        The sweep detects and performs only idempotent transitions:
+        - Reserved receipts whose uploads never completed (→ abandoned after threshold)
+        - Uploaded receipts not yet queued (→ re-enqueue)
+        - Queued/processing receipts beyond age thresholds (→ emit metric, re-enqueue)
+        - Retryable failures eligible for another attempt (→ re-enqueue)
+
+        Destructive cleanup is not part of day one. The sweep emits metrics
+        and records state events. It never deletes evidence.
+      tags: [worker]
+      security:
+        - CloudTasksOIDC: []
+      responses:
+        "200":
+          description: Reconciliation sweep completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - evaluated_count
+                  - re_enqueued_count
+                  - flagged_count
+                properties:
+                  evaluated_count:
+                    type: integer
+                  re_enqueued_count:
+                    type: integer
+                  flagged_count:
+                    type: integer
+                    description: >
+                      Receipts detected as stuck beyond safe recovery by the
+                      sweep. These receive a state event and metric; manual
+                      review is required.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ── Health probes ─────────────────────────────────────────────────────────
+
+  /health/live:
+    get:
+      operationId: healthLive
+      summary: Liveness probe — process is running
+      description: >
+        Returns 200 when the process is alive and able to handle requests.
+        Used by Cloud Run liveness checks. No authentication required.
+      tags: [health]
+      security: []
+      responses:
+        "200":
+          description: Service is live.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: ["ok"]
+              example:
+                status: "ok"
+
+  /health/ready:
+    get:
+      operationId: healthReady
+      summary: Readiness probe — service dependencies are reachable
+      description: >
+        Returns 200 when the database, storage, and queue connections are
+        healthy. Returns 503 when any dependency is unavailable. Used by
+        Cloud Run startup and readiness checks. No authentication required.
+      tags: [health]
+      security: []
+      responses:
+        "200":
+          description: Service is ready.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, checks]
+                properties:
+                  status:
+                    type: string
+                    enum: ["ok"]
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: boolean
+                      storage:
+                        type: boolean
+                      queue:
+                        type: boolean
+              example:
+                status: "ok"
+                checks:
+                  database: true
+                  storage: true
+                  queue: true
+        "503":
+          description: One or more dependencies are unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, checks]
+                properties:
+                  status:
+                    type: string
+                    enum: ["degraded"]
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: boolean
+                      storage:
+                        type: boolean
+                      queue:
+                        type: boolean

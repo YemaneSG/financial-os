@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://financialos.invalid/schemas/extraction-result/v1.json",
+  "title": "ExtractionResult",
+  "description": "Structured output returned by the ReceiptExtractor.extract() interface. This is the raw provider response after transport parsing. It is validated against this schema before any field is persisted to receipt_revisions or line_item_revisions. Model output that does not conform is stored as-is in extraction_runs.raw_response with status 'invalid' and never promoted to a current revision (VAL-001, AI-03).",
+  "type": "object",
+  "required": ["schema_version", "currency"],
+  "additionalProperties": false,
+  "properties": {
+
+    "schema_version": {
+      "type": "string",
+      "const": "v1",
+      "description": "Schema version. Must match the extraction_runs.schema_version recorded per run. Version mismatch causes terminal failure."
+    },
+
+    "merchant_raw": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Merchant name exactly as extracted from the evidence. Source text; never normalized here."
+    },
+
+    "merchant_normalized": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Extractor's suggested normalized merchant name. Non-authoritative; subject to human correction. Stored as normalized field in receipt_revisions."
+    },
+
+    "purchase_date": {
+      "type": ["string", "null"],
+      "description": "Purchase date as found on the receipt in ISO 8601 date format (YYYY-MM-DD). Do not invent a date when not evidenced.",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+
+    "purchase_time": {
+      "type": ["string", "null"],
+      "description": "Purchase time as found on the receipt in HH:MM or HH:MM:SS format (24-hour). Do not invent when not evidenced.",
+      "pattern": "^[0-9]{2}:[0-9]{2}(:[0-9]{2})?$"
+    },
+
+    "purchase_timezone": {
+      "type": ["string", "null"],
+      "maxLength": 100,
+      "description": "IANA timezone name or UTC offset when explicitly stated on the receipt. Do not infer from capture location or merchant geography."
+    },
+
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3,
+      "pattern": "^[A-Z]{3}$",
+      "description": "ISO 4217 currency code. Required; default to 'USD' only when the currency is clearly implied by the evidence and no other currency is present. Never guess."
+    },
+
+    "subtotal_minor": {
+      "type": ["integer", "null"],
+      "description": "Pre-tax, pre-tip receipt subtotal in minor currency units (e.g., cents for USD). Must be a non-negative integer. Null when not evidenced.",
+      "minimum": 0
+    },
+
+    "tax_minor": {
+      "type": ["integer", "null"],
+      "description": "Total tax in minor currency units. Null when not evidenced.",
+      "minimum": 0
+    },
+
+    "tip_minor": {
+      "type": ["integer", "null"],
+      "description": "Tip or gratuity in minor currency units. Null when not evidenced.",
+      "minimum": 0
+    },
+
+    "discount_minor": {
+      "type": ["integer", "null"],
+      "description": "Total discount as a positive magnitude in minor currency units. Null when not evidenced. Stored as positive; deterministic validation applies sign convention.",
+      "minimum": 0
+    },
+
+    "total_minor": {
+      "type": ["integer", "null"],
+      "description": "Grand total in minor currency units. Null when not evidenced. Deterministic validation checks: subtotal + tax + tip - discount ≈ total (within rounding tolerance).",
+      "minimum": 0
+    },
+
+    "payment_method_hint": {
+      "type": ["string", "null"],
+      "maxLength": 100,
+      "description": "Redacted payment method hint (e.g., 'Visa •••• 1234'). Must never contain full card numbers, account numbers, or CVV. Stored as a hint only."
+    },
+
+    "overall_confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Provider or derived overall confidence score for this extraction. Definition varies by provider and prompt version; recorded alongside provider and model ID for interpretability."
+    },
+
+    "line_items": {
+      "type": ["array", "null"],
+      "description": "Ordered line items extracted from the receipt. Null when no line items are evidenced. Empty array means the receipt had no itemized lines.",
+      "items": {
+        "$ref": "#/$defs/LineItem"
+      }
+    },
+
+    "provider_notes": {
+      "type": ["string", "null"],
+      "maxLength": 1000,
+      "description": "Non-financial notes from the provider about extraction quality or ambiguities (e.g., 'Image partially obscured'). Safe to store; must not contain credentials, URLs, or instructions."
+    }
+  },
+
+  "$defs": {
+    "LineItem": {
+      "type": "object",
+      "required": ["ordinal", "raw_description"],
+      "additionalProperties": false,
+      "description": "One line item extracted from the receipt. ordinal reflects evidence order (1-based).",
+      "properties": {
+
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based position in evidence order. Must be unique within this extraction result."
+        },
+
+        "raw_description": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Extracted description exactly as it appears on the receipt. Required."
+        },
+
+        "normalized_description": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Extractor's suggested normalized product/service name. Non-authoritative."
+        },
+
+        "quantity": {
+          "type": ["string", "null"],
+          "description": "Quantity as a decimal string to avoid floating-point loss (e.g., '2', '1.5', '0.75'). Null when not evidenced.",
+          "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+        },
+
+        "unit": {
+          "type": ["string", "null"],
+          "maxLength": 50,
+          "description": "Unit of measure (e.g., 'lb', 'oz', 'each', 'fl oz'). Null when not stated."
+        },
+
+        "unit_price_decimal": {
+          "type": ["string", "null"],
+          "description": "Unit price as a decimal string when precision exceeds minor units (e.g., '3.99', '0.499'). Null when not evidenced.",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$"
+        },
+
+        "line_total_minor": {
+          "type": ["integer", "null"],
+          "description": "Authoritative line total candidate in minor currency units. Null when not evidenced. Deterministic validation checks consistency with quantity × unit_price when both are present.",
+          "minimum": 0
+        },
+
+        "discount_minor": {
+          "type": ["integer", "null"],
+          "description": "Line-level discount as a positive magnitude in minor currency units. Null when not evidenced.",
+          "minimum": 0
+        },
+
+        "category_suggestion": {
+          "type": ["string", "null"],
+          "maxLength": 100,
+          "description": "Non-authoritative category suggestion constrained to a versioned vocabulary defined in the extraction prompt. Never treated as a canonical fact. Stored in line_item_revisions.category_suggestion."
+        },
+
+        "field_confidence": {
+          "type": "object",
+          "description": "Named per-field confidence scores or quality signals. Keys are field names from this schema; values are floats in [0, 1]. An empty object is valid.",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

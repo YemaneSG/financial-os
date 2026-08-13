@@ -1,0 +1,116 @@
+# ── Secrets & credentials ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+secrets.json
+credentials.json
+service-account*.json
+gcloud-key*.json
+
+# ── Private financial evidence (NEVER commit) ─────────────────────────────────
+# Real receipt images, extracted content, statements, transactions, pay stubs
+data/raw/
+data/private/
+receipts/
+*.receipt.json
+*.statement.csv
+*.statement.pdf
+fixtures/private/
+
+# ── Claude Code local state ────────────────────────────────────────────────────
+.claude/settings.local.json
+.claude/plans/
+**/*.jsonl
+!tests/fixtures/**/*.jsonl
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+env/
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ── Node / TypeScript / Vite ──────────────────────────────────────────────────
+node_modules/
+apps/web/dist/
+apps/web/.vite/
+apps/web/coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.eslintcache
+.tsbuildinfo
+
+# ── Terraform / infra ─────────────────────────────────────────────────────────
+infra/.terraform/
+infra/**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.tar
+.docker/
+
+# ── OS noise ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.Spotlight-V100
+.Trashes
+
+# ── Editor noise ──────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.user
+*.swp
+*.swo
+*~
+
+# ── CI / CD ───────────────────────────────────────────────────────────────────
+.cache/
+.task/
+
+# ── Temp / scratch ────────────────────────────────────────────────────────────
+tmp/
+tmp_*/
+scratch/
+*.patch
+*.bak
+
+# ── Alembic ───────────────────────────────────────────────────────────────────
+# Keep all migration files; never ignore alembic/versions/
+# (listed here as documentation of what IS tracked)
+
+# ── CI artifacts that must not contain private data ──────────────────────────
+# benchmark-results-private/
+# acceptance-evidence-private/
+# These stay in the private environment; only synthetic summaries go to CI.
