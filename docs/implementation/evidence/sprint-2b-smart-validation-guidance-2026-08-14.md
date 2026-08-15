@@ -130,4 +130,24 @@ frontend guidance/form tests. The complete local backend regression passed with
 only expected environment-dependent skips; Ruff, formatting, Mypy, ESLint,
 TypeScript, all 138 frontend tests, the production PWA build, OpenAPI validation,
 and private-data scanning passed. Database-backed CI, publication, and the repeated
-owner acceptance check remain pending for this correction.
+owner acceptance check passed through pull request `#7`, main CI, and the existing
+safe deployment pipeline. The affected historical review case then loaded as
+`system_validated` in production without rewriting its evidenced values.
+
+## Mobile correction-action refinement — August 15, 2026
+
+Owner acceptance also identified that the save action was reachable only after
+scrolling to the end of a long itemized correction form. The existing
+`position: sticky` declaration could not surface an element whose natural position
+was already at the end of the form.
+
+The approved presentation-only correction uses a mobile viewport-fixed action bar
+that is constrained to the application shell, clears the iPhone safe area, and
+adds sufficient form padding so the final line item is never covered. The primary
+save action expands into the available width. At 768 px and wider, actions remain
+in normal document flow. Submission, validation, authorization, and immutable
+revision behavior are unchanged.
+
+Local frontend verification passed ESLint, strict TypeScript, all 138 unit tests,
+and the production PWA build. Publication must pass the existing CI, deployment,
+smoke-test, and deployed security-header gates.
