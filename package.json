@@ -19,9 +19,15 @@
     "mobile:build": "pnpm --filter financial-os-mobile build",
     "mobile:test": "pnpm --filter financial-os-mobile test",
     "mobile:lint": "pnpm --filter financial-os-mobile lint",
-    "mobile:type-check": "pnpm --filter financial-os-mobile type-check"
+    "mobile:type-check": "pnpm --filter financial-os-mobile type-check",
+    "premium:db:start": "supabase start",
+    "premium:db:stop": "supabase stop",
+    "premium:db:test": "supabase test db",
+    "premium:db:lint": "supabase db lint",
+    "premium:functions:test": "node --test supabase/functions/_shared/*.test.ts"
   },
   "devDependencies": {
+    "supabase": "2.114.0",
     "typescript": "~5.5.0"
   },
   "engines": {

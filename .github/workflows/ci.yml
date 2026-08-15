@@ -207,6 +207,9 @@ jobs:
       - name: Build premium mobile
         run: pnpm mobile:build
 
+      - name: Test premium Edge authorization boundary
+        run: pnpm premium:functions:test
+
   # ── Security: dependency scan + secret detection ──────────────────────────
   dependency-scan:
     name: Dependency vulnerability scan

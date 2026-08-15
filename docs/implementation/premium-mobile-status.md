@@ -37,12 +37,15 @@ Angular/Capacitor shell.
   draft pull request #19
 - Isolated Angular/Capacitor scaffold, native project preparation, frozen
   dependency graph, and credential-free mobile CI job completed locally
+- Mobile scaffold committed at `5b2d8c1`; credential-free GitHub CI run #48 passed
+- Local Supabase owner predicate, restrictive RLS proof, and caller-scoped Edge
+  Function boundary implemented; 26 database assertions and 6 boundary tests pass
 
 ## In progress
 
-- GitHub CI verification for the mobile scaffold
-- PM-0A Supabase configuration, authorization migration, and Edge Function boundary
+- Hosted Firebase/Supabase signature, Data API, and Edge Function authorization matrix
 - Selection/provisioning of the private PM-0A Supabase/Firebase/Plaid Sandbox resources
+- Plaid Sandbox Hosted Link subject/session proof
 
 ## Blockers and permissions
 
@@ -63,9 +66,9 @@ receipt-system change is required to start PM-0A.
 
 ## Next three actions
 
-1. Publish and verify the PM-0A mobile scaffold through credential-free CI.
-2. Record the PM-0A development resource choices privately.
-3. Implement the common owner predicate and full negative authorization matrix.
+1. Record the PM-0A development resource choices privately and establish private sessions.
+2. Run the hosted Firebase/Supabase authorization matrix and roll back synthetic claims.
+3. Implement and prove the bounded Plaid Hosted Link server/browser session.
 
 ## Active canonical artifacts
 
@@ -81,5 +84,6 @@ receipt-system change is required to start PM-0A.
 ## Last known-good definition
 
 For the receipt product, `origin/main` remains the production baseline. For the
-premium-mobile track, no implementation exists yet. Slice 0 will establish its
-first known-good tag only after every acceptance row passes.
+premium-mobile track, `5b2d8c1` is the first credential-free shell baseline.
+Slice 0 will establish its first complete known-good tag only after every PM-0A
+and PM-0B acceptance row passes.

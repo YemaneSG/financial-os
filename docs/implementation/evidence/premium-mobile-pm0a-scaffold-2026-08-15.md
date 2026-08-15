@@ -2,7 +2,7 @@
 
 **Date:** August 15, 2026
 **Issue:** `#14 — Initialize isolated Angular/Capacitor proof and CI`
-**Status:** Local acceptance complete; credential-free GitHub CI pending
+**Status:** Complete
 **Data boundary:** Synthetic configuration only; no real financial data
 
 ## Outcome
@@ -62,10 +62,10 @@ Angular's optional native LMDB disk cache aborts under the current Intel macOS
 build deterministic and green; this does not change application output. Linux CI
 provides an independent build lane.
 
-## Remaining before issue completion
+## Publication evidence
 
-- Push this scaffold and receive a successful credential-free GitHub CI run.
-- Record the resulting commit and run link in this evidence file.
+- Commit: `5b2d8c1` (`Initialize premium mobile shell`)
+- Credential-free GitHub CI: [run #48 — passed](https://github.com/YemaneSG/financial-os/actions/runs/31911762945)
 
 PM-0A as a whole remains open. Firebase/Supabase authorization and Plaid Hosted
 Link session proof are tracked separately and require private external sessions.
