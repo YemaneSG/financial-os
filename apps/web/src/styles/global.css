@@ -478,3 +478,138 @@ body {
 .validation-list__item--pass { border-left: 3px solid var(--color-success); }
 .validation-list__item--fail { border-left: 3px solid var(--color-error); }
 .validation-list__item--warn { border-left: 3px solid var(--color-warning); }
+
+/* ── Human review form ── */
+.human-review-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-4);
+  /* Extra bottom padding so sticky actions bar doesn't obscure last field */
+  padding-bottom: var(--space-12);
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+.human-review-form__title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+}
+
+.human-review-form__section-title {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  margin-bottom: var(--space-3);
+}
+
+/* Generic form field: label + input stacked */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.form-field label,
+.form-field__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.form-field input[type="text"],
+.form-field input[type="datetime-local"],
+.form-field input[type="number"] {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--font-size-base);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-field input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* Read-only currency display */
+.form-field--readonly { opacity: 0.7; }
+.human-review-form__currency-display {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: default;
+}
+
+/* Line items section */
+.human-review-form__line-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Individual line-item card */
+.line-item-editor {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.line-item-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.line-item-editor__index {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.line-item-editor__order-btns {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Two-column grid for compact paired fields */
+.line-item-editor__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+/* Sticky submit bar — stays visible as user scrolls through long item lists */
+.human-review-form__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-4);
+  /* Safe-area inset for iPhone home-bar */
+  padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  margin: 0 calc(-1 * var(--space-4));
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}

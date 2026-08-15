@@ -4,7 +4,7 @@
 **Owner:** Yemane  
 **Maintainer:** Codex operating lead  
 **Created:** August 13, 2026  
-**Last updated:** August 13, 2026
+**Last updated:** August 14, 2026
 
 ## 1. How to use this register
 
@@ -19,6 +19,22 @@ Status values:
 - `Superseded` — replaced by a later recorded decision.
 
 ## 2. Accepted decisions
+
+### DT-DEC-002 — Sprint 2A is human review and trusted correction
+
+| Field | Decision |
+|---|---|
+| Status | `Accepted` |
+| Decision date | August 14, 2026 |
+| Decision owner | Yemane |
+| Outcome | Correct a `needs_review` receipt through an owner-only mobile/laptop workflow and preserve the correction as an immutable, auditable `human_verified` revision. |
+| Scope boundary | Review/correction only; reliability enhancements, new ingestion sources, matching, analytics, and the DollarTrace rename remain outside this slice. |
+| Delivery model | Codex is product/scope/integration decision maker; Claude Code through Vertex AI supervises three independent standard Sonnet workstreams for backend/data, frontend/product, and security/verification. |
+| Troubleshooting policy | Non-blockers: 15-minute diagnosis then document/defer. Blockers: 30 minutes or two materially different attempts, then stop and wait for the owner. No recursive review or debugging loops. |
+| Implementation contract | `docs/implementation/execution-packets/sprint-2a-human-review.md` |
+| Rationale | Production capture is working; correction is the smallest next capability that converts uncertain extraction into trusted, analysis-ready data without delaying acquisition. |
+
+This decision authorizes the additive human-review API and production deployment described by the execution packet. It does not authorize new data sources, destructive infrastructure changes, or weakening durability, privacy, or authorization controls.
 
 ### DT-DEC-001 — Product name: DollarTrace
 

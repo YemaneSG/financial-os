@@ -15,7 +15,7 @@
 | 1 — Security floor | `docs/security/control-baseline.md` MUST controls | Release blocking; may never be silently waived |
 | 2 — Product contract | `docs/product/PRD.md`, `docs/product/roadmap.md`, `docs/product/open-items-and-decisions.md` | Authoritative scope, outcomes, accepted decisions, and open items |
 | 3 — Architecture contract | `docs/architecture/system-architecture.md`, `docs/architecture/data-architecture.md`, `docs/architecture/technology-recommendation.md` | Authoritative design and data model |
-| 4 — Implementation contract | `docs/implementation/execution-packets/sprint-0-1-receipt-capture.md`, `docs/architecture/implementation-contracts.md` | Authoritative for Wave 1 build |
+| 4 — Implementation contract | The current owner-approved packet in `docs/implementation/execution-packets/`, plus `docs/architecture/implementation-contracts.md` | Authoritative for the bounded implementation slice |
 | 5 — Governance | `docs/governance/ai-development-operating-model.md` | Authoritative for process and roles |
 | 6 — Supporting context | `MAC_MINI_FINANCIAL_OS_BLUEPRINT.md`, `personal_ai_finance_codex_handoff.md` | Informational only; superseded by Tiers 1–5 on any conflict |
 
@@ -53,7 +53,7 @@ Reads the full canonical packet before planning. States the outcome, constraints
 
 ### 3.4 Workstream implementation agents
 
-Three bounded, file-scoped implementation agents for Wave 1 parallel build:
+Use the roles, file boundaries, and workstream labels frozen in the current owner-approved execution packet. The Wave 1 baseline was:
 
 | Workstream | File scope | Boundary |
 |---|---|---|
@@ -61,7 +61,7 @@ Three bounded, file-scoped implementation agents for Wave 1 parallel build:
 | B — Receipt service | `apps/api/`, `src/financial_os/`, `tests/`, `alembic/` | Contract consumer; proposes contract deltas to supervisor |
 | C — Platform / verification | `infra/`, `.github/`, scripts, synthetic E2E harness | Contract consumer; no domain or API implementation |
 
-Agents **submit proposed contract deltas** to the supervisor for approval; they do not modify `contracts/`, root config, or migrations without supervisor integration.
+Agents **submit proposed contract deltas** to the supervisor for approval; they do not modify `contracts/`, root config, or migrations without supervisor integration. A later approved packet may reassign the workstream labels and file scopes while preserving this integration rule.
 
 ### 3.5 Review agents (Gate A / B / C)
 
@@ -83,7 +83,7 @@ Every agent must, in order:
 
 ## 5. What agents must never do
 
-- Expand scope to Plaid, Actual Budget, bank connectors, Amazon/email ingestion, correction UI, transaction matching, analytics, SwiftUI, Android, multi-user, rental itemization, event streaming, Kubernetes, or Redis.
+- Expand beyond the current owner-approved execution packet. Unless that packet explicitly authorizes an item, do not add Plaid, Actual Budget, bank connectors, Amazon/email ingestion, correction UI, transaction matching, analytics, SwiftUI, Android, multi-user, rental itemization, event streaming, Kubernetes, or Redis.
 - Emit real GCP project IDs, Firebase project identifiers, service-account email addresses, or real production resource names in any file, log, screenshot, or CI artifact intended for the public repository.
 - Commit secrets, credentials, signed URLs, auth tokens, or database passwords to source control.
 - Commit real receipt images, extracted financial content from real receipts, owner personal data (email, address, SSN, card numbers), or raw model output from private evidence.

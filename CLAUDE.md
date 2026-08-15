@@ -71,9 +71,11 @@ Use `/session-start` to trigger this.
 
 ---
 
+For work after Wave 1, also read the current owner-approved packet in `docs/implementation/execution-packets/`. Its bounded scope supersedes Wave 1 exclusions only for the explicitly authorized capability.
+
 ## Do not do these things
 
-- Add Plaid, Actual Budget, bank connectors, Amazon/email ingestion, correction UI, transaction matching, analytics, SwiftUI, Android, multi-user, rental itemization, event streaming, Kubernetes, Redis, or any other Wave 2+ feature.
+- Expand beyond the current owner-approved execution packet. Unless that packet explicitly authorizes an item, do not add Plaid, Actual Budget, bank connectors, Amazon/email ingestion, correction UI, transaction matching, analytics, SwiftUI, Android, multi-user, rental itemization, event streaming, Kubernetes, Redis, or another future feature.
 - Commit secrets, signed URLs, auth tokens, or real credentials.
 - Commit real receipt images, extracted real-receipt content, or owner personal data.
 - Emit real GCP project IDs, Firebase project IDs, or Cloud SQL instance names in public artifacts.

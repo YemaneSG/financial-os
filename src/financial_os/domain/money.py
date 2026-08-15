@@ -14,6 +14,39 @@ import json
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+_ZERO_DECIMAL_CURRENCIES = frozenset(
+    {
+        "BIF",
+        "CLP",
+        "DJF",
+        "GNF",
+        "ISK",
+        "JPY",
+        "KMF",
+        "KRW",
+        "MGA",
+        "PYG",
+        "RWF",
+        "UGX",
+        "VND",
+        "VUV",
+        "XAF",
+        "XOF",
+        "XPF",
+    }
+)
+_THREE_DECIMAL_CURRENCIES = frozenset({"BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND"})
+
+
+def minor_unit_exponent(currency: str) -> int:
+    """Return the ISO-style minor-unit exponent supported by V1 validation."""
+    code = currency.upper()
+    if code in _ZERO_DECIMAL_CURRENCIES:
+        return 0
+    if code in _THREE_DECIMAL_CURRENCIES:
+        return 3
+    return 2
+
 
 def compute_asset_manifest_hash(verified_assets: list[dict[str, Any]]) -> str:
     """Compute a deterministic, order-sensitive hash over the verified asset set.
@@ -64,14 +97,17 @@ def parse_decimal_string(value: str | None, field_name: str = "decimal") -> Deci
     """Parse a decimal string safely, returning None for None input.
 
     Raises:
-        ValueError: if the string cannot be parsed as a valid decimal.
+        ValueError: if the string cannot be parsed as a finite decimal.
     """
     if value is None:
         return None
     try:
-        return Decimal(value)
+        d = Decimal(value)
     except InvalidOperation as exc:
         raise ValueError(f"{field_name} is not a valid decimal string: {value!r}") from exc
+    if not d.is_finite():
+        raise ValueError(f"{field_name} must be a finite decimal value, got {value!r}")
+    return d
 
 
 def check_totals_arithmetic(

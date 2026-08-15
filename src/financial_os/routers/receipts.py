@@ -17,6 +17,7 @@ from financial_os.domain.errors import (
     ValidationError,
 )
 from financial_os.schemas.receipt import (
+    CreateHumanRevisionRequest,
     CreateReceiptRequest,
     CreateReceiptResponse,
     DownloadCapabilityResponse,
@@ -134,6 +135,32 @@ async def retry_processing(
             owner=owner,
             receipt_id=receipt_id,
             queue=request.app.state.queue,
+            settings=request.app.state.settings,
+            correlation_id=correlation_id,
+        )
+        await session.commit()
+    return result
+
+
+@router.post(
+    "/receipts/{receipt_id}/human-revisions",
+    response_model=ReceiptDetailSchema,
+)
+async def create_human_revision(
+    receipt_id: uuid.UUID,
+    body: CreateHumanRevisionRequest,
+    request: Request,
+    owner: OwnerDep,
+) -> ReceiptDetailSchema:
+    """Create an immutable human revision. Enforces ownership, stale-write protection,
+    arithmetic validity, and atomic state transition to human_verified (Sprint 2A)."""
+    correlation_id = _correlation_id(request)
+    async with request.app.state.session_factory() as session:
+        result = await services.receipt.create_human_revision(
+            session=session,
+            owner=owner,
+            receipt_id=receipt_id,
+            request=body,
             settings=request.app.state.settings,
             correlation_id=correlation_id,
         )

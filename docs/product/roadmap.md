@@ -3,7 +3,7 @@
 **Status:** Approved sequencing baseline  
 **Owner:** Yemane  
 **Created:** August 12, 2026  
-**Last updated:** August 12, 2026
+**Last updated:** August 14, 2026
 
 ## 1. Purpose
 
@@ -260,11 +260,10 @@ At sprint completion:
 
 ## 6. Current status
 
-- Initial PRD discovery is complete.
-- The day-one receipt capture vertical slice is approved.
-- The evidence-only historical backfill policy is approved.
-- The initial cloud deployment and incremental Mac Mini transition are approved.
-- Requirements traceability, UX, architecture, threat model, control baseline, and the Sprint 0/1 execution packet are prepared as `planning-baseline-2026-08-12-r1`.
-- The planning baseline is ready for three independent Gate A reviews.
-- Implementation has not started.
-- Sprint numbers remain outcome sequence labels; Sprint 0/1 is targeted for one focused implementation session after Gate A and access preflight.
+- Initial PRD discovery and the Sprint 0/1 planning baseline are complete.
+- Sprint 0/1 is implemented and deployed: the owner can authenticate from iPhone Safari, capture HEIC/JPEG receipt evidence, receive durable acknowledgement, view images, and retrieve itemized extraction results.
+- Real owner acceptance on August 13, 2026 confirmed working H-E-B and Costco capture. One system-validated result and one `needs_review` result established the next observed product need.
+- CI and GitHub Actions are green at repository revision `6cb8889`; capture, processing, and image-display repairs are deployed.
+- Sprint 2 is split into bounded slices. **Sprint 2A — Human Review and Trusted Correction** is owner-approved and in progress under `docs/implementation/execution-packets/sprint-2a-human-review.md`.
+- Sprint 2A stops after an owner-only correction can create an immutable `human_verified` revision and the production release is verified. Duplicate detection, image-quality warnings, and expanded offline behavior remain later Sprint 2 slices.
+- The evidence-only historical backfill policy, managed-cloud deployment, incremental Mac Mini transition, personal-only scope, and deferred DollarTrace rename remain approved and unchanged.

@@ -103,6 +103,28 @@ class TestDeterministicArithmetic:
         li_checks = [f for f in findings if f.check_code == "LINE_ITEM_ARITHMETIC_V1"]
         assert any(f.outcome == ValidationOutcome.FAIL for f in li_checks)
 
+    def test_line_item_arithmetic_uses_zero_decimal_currency_exponent(self):
+        raw = make_synthetic_extraction_result()
+        raw["currency"] = "JPY"
+        raw["line_items"][0]["quantity"] = "2"
+        raw["line_items"][0]["unit_price_decimal"] = "399"
+        raw["line_items"][0]["line_total_minor"] = 798
+
+        findings = run_deterministic_checks(raw)
+        li_check = next(f for f in findings if f.check_code == "LINE_ITEM_ARITHMETIC_V1")
+        assert li_check.outcome == ValidationOutcome.PASS
+
+    def test_line_item_arithmetic_uses_three_decimal_currency_exponent(self):
+        raw = make_synthetic_extraction_result()
+        raw["currency"] = "KWD"
+        raw["line_items"][0]["quantity"] = "2"
+        raw["line_items"][0]["unit_price_decimal"] = "3.999"
+        raw["line_items"][0]["line_total_minor"] = 7998
+
+        findings = run_deterministic_checks(raw)
+        li_check = next(f for f in findings if f.check_code == "LINE_ITEM_ARITHMETIC_V1")
+        assert li_check.outcome == ValidationOutcome.PASS
+
     def test_schema_version_check_pass(self):
         raw = make_synthetic_extraction_result()
         findings = run_deterministic_checks(raw)

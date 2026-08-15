@@ -142,6 +142,31 @@ export interface DownloadCapabilityResponse {
   expires_at: Timestamp;
 }
 
+export interface LineItemInput {
+  description: string;
+  normalized_description?: string | null;
+  quantity?: string | null;
+  unit?: string | null;
+  unit_price_decimal?: string | null;
+  line_total_minor?: MinorUnits;
+  discount_minor?: MinorUnits;
+  category_suggestion?: string | null;
+}
+
+export interface CreateHumanRevisionRequest {
+  expected_parent_revision_id: UUID;
+  merchant_normalized?: string | null;
+  purchase_datetime?: string | null;
+  purchase_timezone?: string | null;
+  currency: string;
+  subtotal_minor?: MinorUnits;
+  tax_minor?: MinorUnits;
+  tip_minor?: MinorUnits;
+  discount_minor?: MinorUnits;
+  total_minor: number;
+  line_items: LineItemInput[];
+}
+
 export interface ApiError {
   error_code: string;
   message: string;

@@ -42,6 +42,16 @@ class RetryNotPermittedError(ConflictError):
     message = "Receipt is not in a retryable state."
 
 
+class StaleParentRevisionError(ConflictError):
+    safe_error_code = "STALE_PARENT_REVISION"
+    message = "The expected parent revision does not match the current revision."
+
+
+class InvalidReceiptStateError(ConflictError):
+    safe_error_code = "INVALID_RECEIPT_STATE"
+    message = "Receipt is not in a state that allows human correction."
+
+
 class EvidenceIncompleteError(FinancialOsError):
     safe_error_code = "EVIDENCE_INCOMPLETE"
     http_status = 422

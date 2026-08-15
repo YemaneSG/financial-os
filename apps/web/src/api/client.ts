@@ -1,6 +1,7 @@
 import type {
   CreateReceiptRequest,
   CreateReceiptResponse,
+  CreateHumanRevisionRequest,
   FinalizeReceiptResponse,
   ListReceiptsResponse,
   ReceiptDetail,
@@ -110,6 +111,16 @@ export const apiClient = {
     return request<DownloadCapabilityResponse>(
       `/api/v1/receipts/${receiptId}/assets/${assetId}/download`,
       { method: "POST", body: JSON.stringify({}) },
+    );
+  },
+
+  createHumanRevision(
+    receiptId: UUID,
+    req: CreateHumanRevisionRequest,
+  ): Promise<ReceiptDetail> {
+    return request<ReceiptDetail>(
+      `/api/v1/receipts/${receiptId}/human-revisions`,
+      { method: "POST", body: JSON.stringify(req) },
     );
   },
 };

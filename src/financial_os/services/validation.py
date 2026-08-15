@@ -19,6 +19,7 @@ from typing import Any
 
 import jsonschema
 
+from financial_os.domain.money import minor_unit_exponent
 from financial_os.domain.states import ValidationOutcome
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ def _check_line_item_arithmetic(
     """LINE_ITEM_ARITHMETIC_V1: quantity * unit_price_decimal ≈ line_total_minor."""
     findings = []
     line_items = raw.get("line_items") or []
+    multiplier = Decimal(10) ** minor_unit_exponent(str(raw.get("currency") or "USD"))
 
     for item in line_items:
         ordinal = item.get("ordinal", 0)
@@ -162,9 +164,9 @@ def _check_line_item_arithmetic(
             )
             continue
 
-        # Compute line total in minor units from decimal price.
+        # Compute line total in the currency's minor units.
         # Example: qty=2, price=3.99 USD → computed=798 cents.
-        computed_minor = int((qty * price * 100).to_integral_value())
+        computed_minor = int((qty * price * multiplier).to_integral_value())
         delta = line_total - computed_minor
         passes = abs(delta) <= 2  # allow 2-cent rounding tolerance per line item
 

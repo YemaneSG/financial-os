@@ -83,6 +83,8 @@ components:
       description: >
         Currency amount in minor units (e.g. cents for USD).
         Always an integer; never a float. Null when not evidenced.
+      minimum: 0
+      maximum: 9223372036854775807
       example: 1099
 
     # ── Processing and verification states ────────────────────────────────────
@@ -397,6 +399,111 @@ components:
                   type: string
                 attempt_count:
                   type: integer
+
+    # ── Human revision request schemas ────────────────────────────────────────
+
+    LineItemInput:
+      type: object
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+          pattern: ".*\\S.*"
+          description: Human-authored description; stored as raw_description on the revision.
+        normalized_description:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        quantity:
+          type:
+            - string
+            - "null"
+          maxLength: 20
+          pattern: "^\\d+(?:\\.\\d{1,6})?$"
+          description: Exact decimal quantity as a string. Never binary float.
+          example: "2"
+        unit:
+          type:
+            - string
+            - "null"
+          maxLength: 50
+          example: "ea"
+        unit_price_decimal:
+          type:
+            - string
+            - "null"
+          maxLength: 30
+          pattern: "^\\d+(?:\\.\\d{1,6})?$"
+          description: Unit price as decimal string. Never binary float.
+          example: "3.99"
+        line_total_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        discount_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        category_suggestion:
+          type:
+            - string
+            - "null"
+          maxLength: 100
+
+    CreateHumanRevisionRequest:
+      type: object
+      required:
+        - expected_parent_revision_id
+        - currency
+        - total_minor
+      properties:
+        expected_parent_revision_id:
+          $ref: "#/components/schemas/UUID"
+          description: >
+            Must equal the receipt's current_revision_id. The server rejects
+            with 409 STALE_PARENT_REVISION if it does not match, preventing
+            concurrent overwrites and ensuring exactly-once semantics.
+        merchant_normalized:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        purchase_datetime:
+          type:
+            - string
+            - "null"
+          format: date-time
+        purchase_timezone:
+          type:
+            - string
+            - "null"
+          maxLength: 100
+        currency:
+          $ref: "#/components/schemas/Currency"
+        subtotal_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        tax_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        tip_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        discount_minor:
+          $ref: "#/components/schemas/MinorUnits"
+        total_minor:
+          type: integer
+          minimum: 0
+          maximum: 9223372036854775807
+          description: >
+            Required receipt total in minor units. Must be arithmetically
+            consistent with subtotal + tax + tip - discount within a 1-cent
+            tolerance. Inconsistent totals return 422 without any write.
+        line_items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/LineItemInput"
+          description: >
+            Complete replacement line-item snapshot. The server re-numbers
+            items contiguously starting from 1; client ordinals are ignored.
 
     # ── Error schema ─────────────────────────────────────────────────────────
 
@@ -845,6 +952,98 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/v1/receipts/{receipt_id}/human-revisions:
+    post:
+      operationId: createHumanRevision
+      summary: Submit a human correction and advance the receipt to human_verified
+      description: |
+        Creates an immutable `human` receipt revision whose parent is the receipt's
+        current revision. On success the receipt's `current_revision_id` is
+        atomically advanced and `verification_status` becomes `human_verified`.
+
+        **Pre-conditions:**
+        - Receipt exists and is owned by the caller.
+        - `processing_status` is `extracted` and a current revision exists.
+        - `expected_parent_revision_id` equals the receipt's `current_revision_id`.
+
+        **Stale-write protection:** If two concurrent requests send the same
+        `expected_parent_revision_id`, only the first succeeds. The second
+        receives `409 STALE_PARENT_REVISION`; no duplicate revision is created.
+
+        **Arithmetic enforcement:** The server validates that
+        `subtotal + tax + tip - discount ≈ total` (1-minor-unit tolerance).
+        Inconsistent totals return `422` without any write.
+
+        **Immutability:** The original extractor revision, extraction run,
+        raw model response, and evidence assets are never modified.
+
+        **Lineage:** The new revision's `parent_revision_id` is set to the
+        previous `current_revision_id`, forming an explicit acyclic chain.
+
+        **Line-item re-numbering:** The server re-numbers submitted line items
+        contiguously from 1. Client-supplied ordinals are ignored.
+
+        **Validation findings:** Deterministic checks are re-run on the
+        corrected snapshot and stored on the new revision.
+      tags: [receipts]
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateHumanRevisionRequest"
+      responses:
+        "200":
+          description: >
+            Human revision created. Receipt is now human_verified. Returns the
+            updated receipt detail with source_type human and verification_status
+            human_verified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: >
+            Stale parent revision (STALE_PARENT_REVISION) or receipt not in a
+            correctable state (INVALID_RECEIPT_STATE).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                stale:
+                  value:
+                    error_code: "STALE_PARENT_REVISION"
+                    message: "The expected parent revision does not match the current revision."
+                invalid_state:
+                  value:
+                    error_code: "INVALID_RECEIPT_STATE"
+                    message: "Receipt is not in a state that allows human correction."
+        "422":
+          description: >
+            Input validation failure. Invalid decimal strings, out-of-bounds
+            values, bad currency code, or arithmetically inconsistent totals.
+            No revision is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error_code: "VALIDATION_ERROR"
+                message: "Corrected totals or line-item arithmetic is inconsistent."
 
   # ── Internal worker routes ─────────────────────────────────────────────────
 

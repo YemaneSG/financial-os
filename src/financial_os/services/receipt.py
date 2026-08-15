@@ -24,9 +24,12 @@ from financial_os.domain.errors import (
     AssetNotFoundError,
     EvidenceIncompleteError,
     ForbiddenError,
+    InvalidReceiptStateError,
     NotFoundError,
     RetryNotPermittedError,
+    StaleParentRevisionError,
     StorageError,
+    ValidationError,
 )
 from financial_os.domain.states import (
     ActorType,
@@ -34,6 +37,9 @@ from financial_os.domain.states import (
     ProcessingStatus,
     StateEventDimension,
     UploadStatus,
+    ValidationOutcome,
+    VerificationStatus,
+    can_transition_verification,
     is_already_queued_or_processing,
     is_retryable,
 )
@@ -670,6 +676,193 @@ async def retry_processing(
         receipt_id=receipt.id,
         processing_status=receipt.processing_status,
     )
+
+
+async def create_human_revision(
+    session: AsyncSession,
+    owner: VerifiedOwner,
+    receipt_id: uuid.UUID,
+    request: rschemas.CreateHumanRevisionRequest,
+    settings: Settings,
+    correlation_id: str,
+) -> rschemas.ReceiptDetailSchema:
+    """Create an immutable human revision and transition to human_verified (Sprint 2A).
+
+    Enforces ownership, stale-write protection (SELECT FOR UPDATE + expected_parent_revision_id),
+    arithmetic validity, and atomic state transition. Does NOT commit — router commits.
+    No receipt content (merchant names, amounts, etc.) may appear in log lines.
+    """
+    from decimal import Decimal
+
+    from financial_os.models.extraction import LineItemRevision, ReceiptRevision
+    from financial_os.models.findings import ValidationFinding
+    from financial_os.services.validation import run_deterministic_checks
+
+    # Step 1: resolve owner_id — checks allowlist and session version (IAM-02).
+    owner_id = await _resolve_owner_id(session, owner, settings)
+
+    # Step 2: load receipt with SELECT FOR UPDATE to serialize concurrent writes.
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id, Receipt.owner_id == owner_id)
+        .with_for_update()
+    )
+    receipt = result.scalar_one_or_none()
+    if receipt is None:
+        # Indistinguishable from ForbiddenError per authorization policy.
+        raise NotFoundError()
+
+    # Step 3: pre-condition checks.
+    # Must be extracted and have a current revision before any parent check.
+    if (
+        receipt.processing_status != ProcessingStatus.EXTRACTED
+        or receipt.current_revision_id is None
+    ):
+        raise InvalidReceiptStateError()
+
+    # Stale-parent check runs BEFORE terminal-state rejection so that a replay
+    # with an old parent_revision_id on a human_verified receipt returns
+    # STALE_PARENT_REVISION (not INVALID_RECEIPT_STATE), keeping error codes stable.
+    if receipt.current_revision_id != request.expected_parent_revision_id:
+        raise StaleParentRevisionError()
+
+    # Enforce the canonical verification state machine. Only system_validated and
+    # needs_review may advance to human_verified; unreviewed and terminal states may not.
+    if not can_transition_verification(
+        VerificationStatus(receipt.verification_status),
+        VerificationStatus.HUMAN_VERIFIED,
+    ):
+        raise InvalidReceiptStateError()
+
+    parent_result = await session.execute(
+        select(ReceiptRevision).where(
+            ReceiptRevision.id == receipt.current_revision_id,
+            ReceiptRevision.receipt_id == receipt.id,
+        )
+    )
+    parent_revision = parent_result.scalar_one_or_none()
+    if parent_revision is None:
+        raise InvalidReceiptStateError()
+    if request.currency != parent_revision.currency:
+        raise ValidationError("Correction currency must match the current revision.")
+
+    # Step 4: build corrected_raw for arithmetic validation; re-number line items 1..N.
+    corrected_raw = {
+        "schema_version": "v1",
+        "currency": request.currency,
+        "subtotal_minor": request.subtotal_minor,
+        "tax_minor": request.tax_minor,
+        "tip_minor": request.tip_minor,
+        "discount_minor": request.discount_minor,
+        "total_minor": request.total_minor,
+        "line_items": [
+            {
+                "ordinal": idx + 1,
+                "raw_description": item.description,
+                "quantity": item.quantity,
+                "unit_price_decimal": item.unit_price_decimal,
+                "line_total_minor": item.line_total_minor,
+                "discount_minor": item.discount_minor,
+            }
+            for idx, item in enumerate(request.line_items)
+        ],
+    }
+
+    # Step 5: run deterministic arithmetic checks; reject on any FAIL.
+    # SCHEMA_VERSION_V1 is excluded: human corrections are not from the extraction
+    # pipeline and must not be blocked by the extraction-schema version check.
+    findings_data = run_deterministic_checks(corrected_raw)
+    if any(
+        f.outcome == ValidationOutcome.FAIL and f.check_code != "SCHEMA_VERSION_V1"
+        for f in findings_data
+    ):
+        raise ValidationError("Corrected totals or line-item arithmetic is inconsistent.")
+
+    # Step 6: atomic write — all in the same transaction; do NOT commit here.
+
+    # 6a. Create the new ReceiptRevision.
+    new_revision_id = uuid.uuid4()
+    new_revision = ReceiptRevision(
+        id=new_revision_id,
+        receipt_id=receipt.id,
+        parent_revision_id=receipt.current_revision_id,
+        source_type="human",
+        extraction_run_id=None,
+        merchant_raw=None,
+        merchant_normalized=request.merchant_normalized,
+        purchase_datetime=request.purchase_datetime,
+        purchase_timezone=request.purchase_timezone,
+        currency=request.currency,
+        subtotal_minor=request.subtotal_minor,
+        tax_minor=request.tax_minor,
+        tip_minor=request.tip_minor,
+        discount_minor=request.discount_minor,
+        total_minor=request.total_minor,
+        payment_method_hint=None,
+        overall_confidence=None,
+    )
+    session.add(new_revision)
+
+    # 6b. Create LineItemRevision rows, re-numbered 1..N.
+    for idx, item in enumerate(request.line_items):
+        quantity = Decimal(item.quantity) if item.quantity is not None else None
+        unit_price_decimal = (
+            Decimal(item.unit_price_decimal) if item.unit_price_decimal is not None else None
+        )
+        li = LineItemRevision(
+            id=uuid.uuid4(),
+            receipt_revision_id=new_revision_id,
+            ordinal=idx + 1,
+            raw_description=item.description,
+            normalized_description=item.normalized_description,
+            quantity=quantity,
+            unit=item.unit,
+            unit_price_decimal=unit_price_decimal,
+            line_total_minor=item.line_total_minor,
+            discount_minor=item.discount_minor,
+            category_suggestion=item.category_suggestion,
+            field_confidence={},
+        )
+        session.add(li)
+
+    # 6c. Create ValidationFinding rows for each deterministic check result.
+    for finding in findings_data:
+        finding_row = ValidationFinding(
+            id=uuid.uuid4(),
+            receipt_revision_id=new_revision_id,
+            check_code=finding.check_code,
+            outcome=finding.outcome,
+            observed=finding.observed,
+            expected=finding.expected,
+            rule_version=finding.rule_version,
+        )
+        session.add(finding_row)
+
+    # 6d. Advance receipt — processing_status stays 'extracted', do not touch it.
+    prev_verification = receipt.verification_status
+    receipt.current_revision_id = new_revision_id
+    receipt.verification_status = VerificationStatus.HUMAN_VERIFIED
+    receipt.row_version += 1
+    session.add(receipt)
+
+    # 6e. Append verification state event.
+    session.add(
+        StateEvent(
+            receipt_id=receipt.id,
+            dimension=StateEventDimension.VERIFICATION,
+            from_state=prev_verification,
+            to_state=VerificationStatus.HUMAN_VERIFIED,
+            actor_type=ActorType.USER,
+            reason_code="human_correction_submitted",
+            correlation_id=correlation_id,
+        )
+    )
+
+    # 6f. Flush to DB — does NOT commit (router commits).
+    await session.flush()
+
+    # Step 7: return fresh ReceiptDetailSchema from the same session.
+    return await get_receipt(session=session, owner=owner, receipt_id=receipt_id, settings=settings)
 
 
 async def get_asset_download_capability(
