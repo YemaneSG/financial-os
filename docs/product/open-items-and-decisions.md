@@ -61,7 +61,7 @@ This decision approves the name. It does not authorize an unplanned replacement 
 | Status | `Open` |
 | Priority | Next recommended product slice |
 | Owner | Codex operating lead |
-| Trigger | Explicit owner approval to start Sprint 2B |
+| Trigger | Owner approved Sprint 2B subject to the smart-guidance design recorded below; implementation begins only after the research proposal handback |
 | Expected size | Small bounded vertical slice; no database migration expected |
 | User impact before completion | Failed checks identify that review is needed but do not explain the exact difference or likely cause clearly enough for a fast human decision. |
 
@@ -82,6 +82,73 @@ as: “Receipt total is X; the calculated total is Y; the difference is Z.” Wh
 the difference equals a captured discount or matches the line-item/subtotal gap,
 show a carefully worded possibility that the discount may already be included.
 Never auto-delete or reinterpret a discount; the owner remains the decision maker.
+
+#### Approved product conditions
+
+- Reviewing a receipt must be a quick decision task, not a manual search task.
+- The system must calculate and display the signed difference, then search totals,
+  discounts, line amounts, and line arithmetic for evidence-backed matches.
+- When a likely correction is found, the UI must identify the exact field or item,
+  explain why it matches, and offer a one-tap draft correction for confirmation.
+- A matching amount alone may be shown as a candidate but is not enough to
+  recommend deletion. A strong recommendation must also restore the relevant
+  line-item/subtotal and receipt-total equations.
+- The owner must always have `Confirm as shown` and `Edit manually` alternatives.
+  The manual path is a fallback, not the expected review workflow.
+- Applying a suggestion changes only the editable preview. The immutable human
+  revision is written only after explicit confirmation.
+
+#### Smart candidate engine proposal
+
+1. Build an exact integer-minor-unit reconciliation graph containing receipt
+   components, gross and net line-item sums, receipt and line discounts, and
+   quantity-by-unit-price calculations.
+2. Generate bounded minimal-edit hypotheses: remove or restore a duplicated
+   receipt discount; move a discount between receipt and line scope; correct a
+   line whose quantity-by-price result is exact; or add/remove one line whose
+   amount equals the signed discrepancy.
+3. Consider a bounded two-line combination only when it is unique and closes
+   both reconciliation equations. Do not perform an open-ended subset search
+   that can manufacture coincidental explanations.
+4. Rank candidates by deterministic evidence: exact discrepancy match, number of
+   equations restored, discount/coupon/savings label evidence, adjacency to the
+   affected item, uniqueness, and minimum edit count. Present evidence bands such
+   as `Strong`, `Possible`, or `Ambiguous`; do not invent probability percentages.
+5. Present at most three ranked action cards. Each card includes the difference,
+   identified item or field, before/after equation, why it is proposed, and an
+   `Apply and preview` action that immediately reruns all checks.
+
+Example interaction using synthetic amounts:
+
+> **Difference: $4.99**
+>
+> One line matches the gap: Item 7, “Example item,” $4.99. Removing it also makes
+> the item sum equal the subtotal and the calculated total equal the receipt
+> total. **Strong match.**
+>
+> `Apply and preview` · `Confirm as shown` · `Choose another`
+
+When the evidence is not strong, the system says so and still shows the relevant
+candidate rows. It never sends the owner back to scan the receipt unaided.
+
+#### Confirm-as-shown semantics
+
+`Confirm as shown` creates an immutable human revision that preserves the
+evidenced values and retains the failed arithmetic finding. The verification axis
+records that a human confirmed the evidence; it does not pretend the arithmetic
+passed. The UI displays `Human confirmed — arithmetic exception`, and the
+append-only state event uses a privacy-safe reason such as
+`human_confirmed_exception`. The existing revision, finding, and event structures
+can support this without a database migration; the current service rejection of
+failed human revisions must be relaxed only for this explicit disposition.
+
+#### Review-time target
+
+- Strong proposal: target confirmation in 15 seconds or less after opening review.
+- Ambiguous proposal: target a decision in 30 seconds or less using ranked choices
+  or `Confirm as shown`.
+- Measure proposal acceptance, rejection, manual-edit use, exception use, and
+  review duration without logging receipt content or amounts.
 
 #### Bounded Sprint 2B scope
 
