@@ -1,6 +1,6 @@
 # Execution Packet — Sprint 2A Human Review and Trusted Correction
 
-**Status:** Approved — in progress
+**Status:** Implemented and deployed — owner acceptance pending
 **Packet owner:** Yemane
 **Operating lead:** Codex
 **Implementation lead:** Claude Code through Vertex AI
@@ -180,10 +180,10 @@ The three workstreams perform independent analysis within their boundaries. They
 - [x] OpenAPI/schema compatibility validation
 - [x] Migration upgrade/downgrade validation; no Sprint 2A migration required
 - [x] Local secret and private-data scans; authoritative CI Gitleaks gate pending publication
-- [ ] Dependency/static security checks already enforced by CI
+- [x] Dependency/static security checks already enforced by CI
 - [x] One bounded three-perspective independent review and finding disposition
-- [ ] Production deploy and privacy-safe smoke evidence
-- [ ] Canonical roadmap, decision register, packet, and evidence updated
+- [x] Production deploy and privacy-safe smoke evidence
+- [x] Canonical roadmap, decision register, packet, and evidence updated
 
 ## 15. Troubleshooting budget and stop rules
 

@@ -1,6 +1,6 @@
 # Sprint 2A human review — verification evidence
 
-**Status:** Local release gates passed; remote CI, deployment, and owner acceptance pending
+**Status:** Implemented and deployed; owner-controlled correction acceptance pending
 **Date:** August 14, 2026
 **Scope:** Owner-only receipt correction and immutable human verification
 **Data policy:** Synthetic fixtures only; private deployment identifiers intentionally omitted
@@ -83,8 +83,8 @@ test lifecycle completed.
 | Authorization | Pass locally | Missing, invalid, non-allowlisted, and cross-owner negative tests |
 | Human verification state | Pass locally | Integration and UI assertions |
 | Capture/extraction regression | Pass locally | Existing backend and PWA suites remain green |
-| CI dependency/static security gates | Pending | GitHub Actions after publication |
-| Production deploy and privacy-safe smoke | Pending | Existing immutable-image, migrate-before-traffic workflow |
+| CI dependency/static security gates | Pass | [CI run 31860806179](https://github.com/YemaneSG/financial-os/actions/runs/31860806179) |
+| Production deploy and privacy-safe smoke | Pass | [Deploy run 31860806300](https://github.com/YemaneSG/financial-os/actions/runs/31860806300) |
 | Owner-controlled production correction | Pending | Physical-device acceptance after deployment |
 
 ## Bounded troubleshooting record
@@ -101,10 +101,18 @@ No blocker exceeded two attempts or the approved troubleshooting budget.
 
 ## Publication record
 
-To be completed after the release workflow:
+- Release commit: `b03863c0ac1e845779c3e69404b85b3ebcc26139`
+- GitHub CI: pass — all lint, type, test, contract, migration, dependency,
+  container, infrastructure, secret, and private-data jobs completed successfully
+  in [run 31860806179](https://github.com/YemaneSG/financial-os/actions/runs/31860806179).
+- Production deployment: pass — immutable image build, one-shot migration,
+  no-traffic API and worker candidates, candidate readiness smoke, and explicit
+  traffic switches completed successfully in
+  [run 31860806300](https://github.com/YemaneSG/financial-os/actions/runs/31860806300).
+- PWA deployment: pass — production build, Firebase Hosting publication, and
+  deployed security-header validation completed in the same deployment run.
+- Owner acceptance: pending one owner-controlled correction on phone or laptop.
 
-- Release commit: pending
-- GitHub CI: pending
-- Production deployment: pending
-- Privacy-safe smoke: pending
-- Owner acceptance: pending
+The docs-only closeout commit containing this final publication record has no
+runtime effect and intentionally does not redeploy the already verified release
+artifact.

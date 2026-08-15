@@ -32,6 +32,7 @@ Status values:
 | Delivery model | Codex is product/scope/integration decision maker; Claude Code through Vertex AI supervises three independent standard Sonnet workstreams for backend/data, frontend/product, and security/verification. |
 | Troubleshooting policy | Non-blockers: 15-minute diagnosis then document/defer. Blockers: 30 minutes or two materially different attempts, then stop and wait for the owner. No recursive review or debugging loops. |
 | Implementation contract | `docs/implementation/execution-packets/sprint-2a-human-review.md` |
+| Release evidence | Implemented at `b03863c`; CI and deployment passed in GitHub Actions runs `31860806179` and `31860806300`; owner-controlled production correction acceptance remains pending. |
 | Rationale | Production capture is working; correction is the smallest next capability that converts uncertain extraction into trusted, analysis-ready data without delaying acquisition. |
 
 This decision authorizes the additive human-review API and production deployment described by the execution packet. It does not authorize new data sources, destructive infrastructure changes, or weakening durability, privacy, or authorization controls.
