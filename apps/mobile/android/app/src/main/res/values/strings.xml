@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Financial OS PM-0A</string>
+    <string name="title_activity_main">Financial OS PM-0A</string>
+    <string name="package_name">dev.financialos.premium.proof</string>
+    <string name="custom_url_scheme">dev.financialos.premium.proof</string>
+</resources>

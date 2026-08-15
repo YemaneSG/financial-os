@@ -1,0 +1,24 @@
+main {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: max(2rem, env(safe-area-inset-top)) 1.5rem
+    max(2rem, env(safe-area-inset-bottom));
+  display: grid;
+  align-content: center;
+  gap: 1rem;
+}
+
+.eyebrow,
+.boundary {
+  color: #415165;
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+h1,
+p {
+  margin: 0;
+}

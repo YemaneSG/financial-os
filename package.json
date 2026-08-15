@@ -5,7 +5,8 @@
   "description": "Financial OS — root workspace",
   "packageManager": "pnpm@11.19.0",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/mobile"
   ],
   "scripts": {
     "dev": "pnpm --filter @financial-os/web dev",
@@ -13,7 +14,12 @@
     "test": "pnpm --filter @financial-os/web test",
     "test:e2e": "pnpm --filter @financial-os/web test:e2e",
     "lint": "pnpm --filter @financial-os/web lint",
-    "type-check": "pnpm --filter @financial-os/web type-check"
+    "type-check": "pnpm --filter @financial-os/web type-check",
+    "mobile:dev": "pnpm --filter financial-os-mobile start",
+    "mobile:build": "pnpm --filter financial-os-mobile build",
+    "mobile:test": "pnpm --filter financial-os-mobile test",
+    "mobile:lint": "pnpm --filter financial-os-mobile lint",
+    "mobile:type-check": "pnpm --filter financial-os-mobile type-check"
   },
   "devDependencies": {
     "typescript": "~5.5.0"

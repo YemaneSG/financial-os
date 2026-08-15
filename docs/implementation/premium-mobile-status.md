@@ -33,11 +33,15 @@ Angular/Capacitor shell.
   conditions; no blocking/high design finding remains
 - Owner approved the architecture, security addendum, threat model, PM-0A packet,
   synthetic/free/no-upgrade Sandbox actions, and official dependency downloads
+- Owner-approved Gate A snapshot committed at `afef862`, pushed, and opened as
+  draft pull request #19
+- Isolated Angular/Capacitor scaffold, native project preparation, frozen
+  dependency graph, and credential-free mobile CI job completed locally
 
 ## In progress
 
-- First approved snapshot commit, push, and draft pull request
-- PM-0A dependency baseline and isolated mobile/Supabase scaffold
+- GitHub CI verification for the mobile scaffold
+- PM-0A Supabase configuration, authorization migration, and Edge Function boundary
 - Selection/provisioning of the private PM-0A Supabase/Firebase/Plaid Sandbox resources
 
 ## Blockers and permissions
@@ -59,9 +63,9 @@ receipt-system change is required to start PM-0A.
 
 ## Next three actions
 
-1. Freeze and publish the owner-approved Gate A snapshot.
+1. Publish and verify the PM-0A mobile scaffold through credential-free CI.
 2. Record the PM-0A development resource choices privately.
-3. Move PM-0A issues into execution and initialize the synthetic proof only.
+3. Implement the common owner predicate and full negative authorization matrix.
 
 ## Active canonical artifacts
 
