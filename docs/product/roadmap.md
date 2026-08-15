@@ -1,8 +1,8 @@
 # Financial OS — Outcome Roadmap
 
-**Status:** Approved sequencing baseline  
-**Owner:** Yemane  
-**Created:** August 12, 2026  
+**Status:** Approved sequencing baseline
+**Owner:** Yemane
+**Created:** August 12, 2026
 **Last updated:** August 15, 2026
 
 ## 1. Purpose
@@ -23,6 +23,30 @@ The roadmap is model-agnostic and outcome-oriented. Sprint numbers describe sequ
 8. A sprint exit requires evidence against its acceptance criteria, not merely completed code.
 
 ## 3. Capability sequence
+
+### Parallel product track — Premium mobile application
+
+**Status:** Architecture, security, and PM-0A approved; PM-0A in progress and
+PM-0B deferred pending its native lane.
+
+This track is independent of the receipt capability sequence below. The operating
+receipt collector continues capturing data and remains authoritative for receipts.
+Premium-mobile work occurs only in its isolated application/Supabase boundaries
+and consumes receipt evidence through a stable read-only API adapter.
+
+| Slice | Observable outcome | Gate |
+|---|---|---|
+| PM-0A — Hosted auth and browser/session proof | A dedicated synthetic Firebase subject is enforced through Supabase RLS/Edge Functions and a bound Plaid Hosted Link session completes server-side | Owner-approved architecture/security/packet and Sandbox authority |
+| PM-0B — Native build and return proof | Current iOS and Android builds complete safe Hosted Link return on the approved targets | Xcode 26, real iPhone, Android SDK/emulator, and callback privacy evidence |
+| PM-1 — Installable shell and activity | The owner installs the Angular/Capacitor app, connects Plaid Sandbox, and sees deterministic transaction activity and sync health | PM-0 evidence plus CI |
+| PM-2 — Receipt adapter | Existing receipt evidence appears read-only without copying private evidence into Supabase | Frozen receipt contract remains unchanged |
+| PM-3 — Deterministic matching | The owner confirms, rejects, or leaves match candidates unresolved without losing decisions on regeneration | Exact-money and provenance tests |
+| PM-4 — Reflection | The owner completes accessible, editable, selection-aware reflection sessions and builds a durable personal-value dataset | Representative exposure and missing-evidence tests |
+| PM-5 — Owner live acceptance | Authorized Plaid Trial/live history syncs idempotently with backup, restore, disconnect, export, and deletion evidence | Gate D and explicit real-data authority |
+| PM-6 — Private distribution | A polished private iOS/Android build is distributed to the owner | Store/device/privacy checks; friends-and-family still disabled |
+
+Each slice receives its own owner-approved execution packet. Completion is tracked
+in the private GitHub Project and the repository status snapshot.
 
 ### Sprint 0 — Model-agnostic project foundation
 

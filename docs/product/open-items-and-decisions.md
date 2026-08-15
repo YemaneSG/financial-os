@@ -1,9 +1,9 @@
 # DollarTrace — Open Items and Decision Register
 
-**Status:** Active canonical register  
-**Owner:** Yemane  
-**Maintainer:** Codex operating lead  
-**Created:** August 13, 2026  
+**Status:** Active canonical register
+**Owner:** Yemane
+**Maintainer:** Codex operating lead
+**Created:** August 13, 2026
 **Last updated:** August 15, 2026
 
 ## 1. How to use this register
@@ -19,6 +19,44 @@ Status values:
 - `Superseded` — replaced by a later recorded decision.
 
 ## 2. Accepted decisions
+
+### DT-DEC-005 — Premium mobile application is a separate product track
+
+| Field | Decision |
+|---|---|
+| Status | `Accepted — architecture/security approved and PM-0A authorized` |
+| Decision date | August 15, 2026 |
+| Decision owner | Yemane |
+| Product boundary | Build a new private premium mobile application alongside the operating receipt collector. The receipt collector continues unchanged and remains authoritative for receipt evidence. |
+| Client direction | Angular with Capacitor packaging for iOS and Android. |
+| New backend direction | Supabase owns only new application domains. The existing receipt database is not migrated, replicated, joined directly, or dual-written. |
+| Bank connectivity | Plaid Transactions is required immediately in the premium application, beginning with Sandbox and moving to owner-authorized Trial/live use. |
+| Identity direction | Prefer the existing Firebase owner identity through Supabase-supported Firebase third-party authentication; prove this before committing the shell. |
+| Initial experience | Awareness and reflection: activity, receipt evidence, deterministic match confirmation, and low-friction personal-value feedback. Pre-purchase guidance is not v1. |
+| Distribution | One private owner first; controlled friends-and-family access requires a later multi-user packet. |
+| Architecture candidate | `docs/architecture/premium-mobile-system-architecture.md`, derived from the Opus proposal and corrected through Gate A |
+| Current gate | Gate A technical review passed at revision 2. The owner approved the architecture, security addendum, PM-0A packet, and bounded synthetic Sandbox authority on August 15, 2026. PM-0A is executable; PM-0B remains deferred pending its native lane. |
+
+This decision resolves the apparent Wave 1 conflict without changing the prior
+receipt decision. Plaid and Android remain excluded from the receipt product and
+are authorized only inside the separate premium-mobile track when a bounded
+packet explicitly includes them.
+
+### DT-DEC-006 — GitHub Project is the premium-mobile delivery system of record
+
+| Field | Decision |
+|---|---|
+| Status | `Accepted — configured` |
+| Decision date | August 15, 2026 |
+| Decision owner | Yemane |
+| Live tracking | The private [Financial OS — Premium Mobile](https://github.com/users/YemaneSG/projects/2) Project links architecture slices, issues, pull requests, reviews, device verification, blockers, and completion. |
+| Durable state | Canonical product/architecture documents, execution packets, evidence files, commits, and tags remain reconstructable without any AI conversation. |
+| Work unit | One bounded issue normally maps to one branch and one pull request. No issue is Done without its acceptance evidence. |
+| WIP control | At most two implementation issues may be In Progress. Shared contracts, migrations, and root configuration have one integration owner. |
+| Snapshot | `docs/implementation/premium-mobile-status.md` records the current slice, last known-good revision, blockers, next work, and evidence links. |
+
+AI agents receive an issue plus the current execution packet. Agent memory and
+chat history are supporting context, never the project-management system.
 
 ### DT-DEC-004 — Sprint 2C combines receipt integrity and discovery
 
