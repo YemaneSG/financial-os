@@ -58,12 +58,30 @@ This decision approves the name. It does not authorize an unplanned replacement 
 
 | Field | Value |
 |---|---|
-| Status | `Open` |
-| Priority | Next recommended product slice |
+| Status | `In progress — implementation and local verification complete; release and owner acceptance pending` |
+| Priority | Current bounded product slice |
 | Owner | Codex operating lead |
 | Trigger | Owner approved Sprint 2B subject to the smart-guidance design recorded below; implementation begins only after the research proposal handback |
 | Expected size | Small bounded vertical slice; no database migration expected |
 | User impact before completion | Failed checks identify that review is needed but do not explain the exact difference or likely cause clearly enough for a fast human decision. |
+
+#### Implementation checkpoint — August 14, 2026
+
+The approved Sprint 2B slice is implemented and locally verified. The owner-only
+receipt detail now returns bounded deterministic evidence and up to three ranked
+proposals; the mobile review flow shows the signed difference, formatted candidate
+amount, reason, live preview, explicit confirm-as-shown path, and the retained
+arithmetic-exception state. Confirm-as-shown uses full-snapshot semantic equality,
+exact decimal comparison, immutable child revisions, failed-finding retention,
+stale-parent protection, and privacy-safe event reasons.
+
+One non-blocking hypothesis remains deliberately deferred: a unique two-line
+removal combination. The current engine handles receipt discounts, line discounts,
+gross/net subtotal support, exact quantity-by-price corrections, and one-line
+removal only when simulation restores a material equation. A two-line deletion
+requires additional evidence and UI targeting to avoid presenting a coincidental
+or destructive suggestion; it is not needed for the observed discount case and
+does not block Sprint 2B release.
 
 #### Owner-observed problem
 

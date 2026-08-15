@@ -279,6 +279,42 @@ components:
           enum: [pass, warn, fail, not_applicable]
         rule_version:
           type: string
+        observed:
+          type:
+            - object
+            - "null"
+          description: >
+            Privacy-safe observed numeric values for this check. Contains only
+            bounded scalar numbers, booleans, or safe string codes. Never
+            contains receipt text, merchant names, or owner identifiers.
+          maxProperties: 8
+          propertyNames:
+            maxLength: 64
+          additionalProperties:
+            oneOf:
+              - type: integer
+              - type: number
+              - type: boolean
+              - type: string
+                maxLength: 50
+              - type: "null"
+        expected:
+          type:
+            - object
+            - "null"
+          description: >
+            Privacy-safe expected values or tolerance for this check.
+          maxProperties: 8
+          propertyNames:
+            maxLength: 64
+          additionalProperties:
+            oneOf:
+              - type: integer
+              - type: number
+              - type: boolean
+              - type: string
+                maxLength: 50
+              - type: "null"
 
     RevisionSummary:
       type: object
@@ -297,6 +333,12 @@ components:
             - string
             - "null"
           format: date-time
+        purchase_timezone:
+          type:
+            - string
+            - "null"
+          maxLength: 100
+          description: IANA timezone name for the purchase location.
         currency:
           $ref: "#/components/schemas/Currency"
         subtotal_minor:
@@ -315,6 +357,181 @@ components:
             - "null"
           minimum: 0
           maximum: 1
+
+    # ── Sprint 2B: Review guidance schemas ───────────────────────────────────
+
+    DraftPatch:
+      type: object
+      required:
+        - op
+      description: >
+        One allowlisted draft patch operation. Applied client-side only to update
+        the editable draft. Never accepted as server-side correction authority.
+        The server validates the complete submitted snapshot through the existing
+        human-revision operation.
+      properties:
+        op:
+          type: string
+          enum:
+            - clear_receipt_discount
+            - set_receipt_subtotal
+            - set_receipt_discount
+            - clear_receipt_subtotal
+            - clear_line_discount
+            - set_line_total
+            - remove_line_item
+          description: Allowlisted operation type.
+        ordinal:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 10000
+          description: Target line-item ordinal for item-level operations.
+        value:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 9223372036854775807
+          description: Amount in minor units for set operations.
+
+    ReviewCandidate:
+      type: object
+      required:
+        - kind
+        - evidence_band
+        - reason_codes
+        - equations_before
+        - equations_after
+        - draft_patch
+      description: >
+        One deterministic correction proposal from the reconciliation engine.
+        At most three candidates are returned. Evidence bands are strong,
+        possible, or ambiguous — no probability percentages are used.
+        Fields contain amounts and ordinals only; no receipt text or PII.
+      properties:
+        kind:
+          type: string
+          maxLength: 100
+          description: >
+            Machine-readable proposal kind, e.g. clear_receipt_discount,
+            use_gross_line_sum_as_subtotal, clear_line_discount, replace_line_total,
+            remove_line_item, line_pair_adjustment.
+        evidence_band:
+          type: string
+          enum: [strong, possible, ambiguous]
+          description: >
+            strong — restores all material equations and is uniquely preferred.
+            possible — matches the discrepancy but does not restore all equations.
+            ambiguous — multiple equal candidates exist; none is uniquely preferred.
+        target_field:
+          type:
+            - string
+            - "null"
+          description: Receipt field affected, e.g. discount_minor or subtotal_minor.
+          maxLength: 100
+        target_item_ordinal:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          maximum: 10000
+          description: Line-item ordinal for item-level proposals.
+        amount_minor:
+          type:
+            - integer
+            - "null"
+          description: Current problematic amount in minor units.
+          minimum: 0
+          maximum: 9223372036854775807
+        reason_codes:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 100
+          description: Privacy-safe reason codes explaining why this candidate was generated.
+        equations_before:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 500
+          description: Equations showing the current arithmetic state.
+        equations_after:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 500
+          description: Equations showing the arithmetic state after applying this proposal.
+        draft_patch:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/DraftPatch"
+          description: Allowlisted patch operations to apply to the client draft.
+
+    ReviewGuidance:
+      type: object
+      required:
+        - signed_delta_minor
+        - receipt_total_minor
+        - computed_total_minor
+        - component_equation
+        - review_candidates
+      description: >
+        Deterministic reconciliation guidance for receipts with arithmetic exceptions.
+        Present only when the current revision has a material arithmetic failure.
+        Contains at most three ranked candidates. No probability percentages;
+        evidence bands are strong, possible, or ambiguous only.
+        No receipt text or private identifiers — amounts and ordinals only.
+      properties:
+        signed_delta_minor:
+          type: integer
+          description: >
+            Signed difference: receipt_total_minor - computed_total_minor.
+            Negative means the receipt total is lower than computed.
+        receipt_total_minor:
+          type: integer
+          minimum: 0
+          maximum: 9223372036854775807
+          description: The receipt total from the current revision.
+        computed_total_minor:
+          type: integer
+          description: Computed total from component equation.
+        component_equation:
+          type: string
+          maxLength: 500
+          description: >
+            Human-readable component equation string, e.g.
+            "subtotal + tax + tip - discount = computed".
+        gross_line_sum_minor:
+          type:
+            - integer
+            - "null"
+          description: Sum of all line_total_minor values when available.
+        net_line_sum_minor:
+          type:
+            - integer
+            - "null"
+          description: Gross line sum minus sum of line discount_minor values.
+        subtotal_vs_gross_delta_minor:
+          type:
+            - integer
+            - "null"
+          description: subtotal_minor - gross_line_sum_minor when both are available.
+        subtotal_vs_net_delta_minor:
+          type:
+            - integer
+            - "null"
+          description: subtotal_minor - net_line_sum_minor when both are available.
+        review_candidates:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/ReviewCandidate"
 
     # ── Receipt schemas ───────────────────────────────────────────────────────
 
@@ -399,6 +616,16 @@ components:
                   type: string
                 attempt_count:
                   type: integer
+            review_guidance:
+              oneOf:
+                - $ref: "#/components/schemas/ReviewGuidance"
+                - type: "null"
+              description: >
+                Deterministic reconciliation guidance. Present when the
+                current revision has a material arithmetic failure.
+                Null when arithmetic passes or no revision exists.
+                Owner-private — must not appear in logs, analytics, or
+                public CI artifacts.
 
     # ── Human revision request schemas ────────────────────────────────────────
 
@@ -504,6 +731,21 @@ components:
           description: >
             Complete replacement line-item snapshot. The server re-numbers
             items contiguously starting from 1; client ordinals are ignored.
+        review_disposition:
+          type: string
+          enum: [corrected, confirmed_as_shown]
+          default: corrected
+          description: >
+            corrected (default): all material deterministic findings must pass
+            before persistence. Backward-compatible default.
+
+            confirmed_as_shown: submitted snapshot must semantically equal the
+            locked current parent revision. Failed arithmetic findings are
+            allowed and retained. The server records a human_confirmed_exception
+            verification event when any material finding fails, otherwise
+            human_confirmed_as_shown. Stale-write protection, ownership,
+            currency, state-machine enforcement, transaction atomicity, and
+            immutable lineage remain unchanged for both dispositions.
 
     # ── Error schema ─────────────────────────────────────────────────────────
 

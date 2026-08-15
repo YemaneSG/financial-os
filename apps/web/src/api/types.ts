@@ -61,10 +61,49 @@ export interface LineItemSummary {
   category_suggestion?: string | null;
 }
 
+export interface DraftPatch {
+  op:
+    | "clear_receipt_discount"
+    | "set_receipt_subtotal"
+    | "set_receipt_discount"
+    | "clear_receipt_subtotal"
+    | "clear_line_discount"
+    | "set_line_total"
+    | "remove_line_item";
+  ordinal?: number | null;
+  value?: number | null;
+}
+
+export interface ReviewCandidate {
+  kind: string;
+  evidence_band: "strong" | "possible" | "ambiguous";
+  target_field?: string | null;
+  target_item_ordinal?: number | null;
+  amount_minor?: number | null;
+  reason_codes: string[];
+  equations_before: string[];
+  equations_after: string[];
+  draft_patch: DraftPatch[];
+}
+
+export interface ReviewGuidance {
+  signed_delta_minor: number;
+  receipt_total_minor: number;
+  computed_total_minor: number;
+  component_equation: string;
+  gross_line_sum_minor?: number | null;
+  net_line_sum_minor?: number | null;
+  subtotal_vs_gross_delta_minor?: number | null;
+  subtotal_vs_net_delta_minor?: number | null;
+  review_candidates: ReviewCandidate[];
+}
+
 export interface ValidationFindingSummary {
   check_code: string;
   outcome: "pass" | "warn" | "fail" | "not_applicable";
   rule_version?: string;
+  observed?: Record<string, unknown> | null;
+  expected?: Record<string, unknown> | null;
 }
 
 export interface RevisionSummary {
@@ -72,6 +111,7 @@ export interface RevisionSummary {
   source_type?: "extractor" | "human" | "import";
   merchant_normalized?: string | null;
   purchase_datetime?: string | null;
+  purchase_timezone?: string | null;
   currency?: Currency;
   subtotal_minor?: MinorUnits;
   tax_minor?: MinorUnits;
@@ -97,6 +137,7 @@ export interface ReceiptDetail extends ReceiptListItem {
   line_items?: LineItemSummary[] | null;
   validation_findings?: ValidationFindingSummary[] | null;
   safe_error_code?: string | null;
+  review_guidance?: ReviewGuidance | null;
   provenance_summary?: {
     provider: string;
     model_id: string;
@@ -165,6 +206,7 @@ export interface CreateHumanRevisionRequest {
   discount_minor?: MinorUnits;
   total_minor: number;
   line_items: LineItemInput[];
+  review_disposition?: "corrected" | "confirmed_as_shown";
 }
 
 export interface ApiError {

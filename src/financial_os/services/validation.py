@@ -86,6 +86,7 @@ def run_deterministic_checks(
     findings.append(_check_totals_arithmetic(raw, tolerance_minor))
     findings.extend(_check_line_item_arithmetic(raw))
     findings.append(_check_schema_version(raw))
+    findings.append(_check_line_items_to_subtotal(raw))
     return findings
 
 
@@ -186,6 +187,63 @@ def _check_line_item_arithmetic(
         )
 
     return findings
+
+
+def _check_line_items_to_subtotal(raw: dict[str, Any]) -> ValidationFindingData:
+    """LINE_ITEMS_TO_SUBTOTAL_V1: subtotal ≈ gross or net line-item sum.
+
+    NOT_APPLICABLE when any existing line item lacks line_total_minor — a partial
+    sum must not be treated as a complete line-item coverage figure.
+    """
+    subtotal = raw.get("subtotal_minor")
+    line_items = raw.get("line_items") or []
+
+    if subtotal is None or not line_items:
+        return ValidationFindingData(
+            check_code="LINE_ITEMS_TO_SUBTOTAL_V1",
+            outcome=ValidationOutcome.NOT_APPLICABLE,
+            observed={"line_count": len(line_items), "subtotal_present": subtotal is not None},
+            expected=None,
+            rule_version="1",
+        )
+
+    # If ANY line item is missing line_total_minor, coverage is incomplete.
+    lines_with_total = [li for li in line_items if li.get("line_total_minor") is not None]
+    if len(lines_with_total) != len(line_items):
+        return ValidationFindingData(
+            check_code="LINE_ITEMS_TO_SUBTOTAL_V1",
+            outcome=ValidationOutcome.NOT_APPLICABLE,
+            observed={
+                "line_count": len(line_items),
+                "lines_with_total": len(lines_with_total),
+                "subtotal_present": True,
+            },
+            expected=None,
+            rule_version="1",
+        )
+
+    gross_sum = sum(li["line_total_minor"] for li in lines_with_total)
+    line_discount_sum = sum(li.get("discount_minor") or 0 for li in line_items)
+    net_sum = gross_sum - line_discount_sum
+
+    gross_delta = subtotal - gross_sum
+    net_delta = subtotal - net_sum
+    tolerance = 1
+
+    passes = abs(gross_delta) <= tolerance or abs(net_delta) <= tolerance
+    return ValidationFindingData(
+        check_code="LINE_ITEMS_TO_SUBTOTAL_V1",
+        outcome=ValidationOutcome.PASS if passes else ValidationOutcome.FAIL,
+        observed={
+            "subtotal_minor": subtotal,
+            "gross_line_sum_minor": gross_sum,
+            "net_line_sum_minor": net_sum,
+            "gross_delta_minor": gross_delta,
+            "net_delta_minor": net_delta,
+        },
+        expected={"tolerance_minor": tolerance},
+        rule_version="1",
+    )
 
 
 def _check_schema_version(raw: dict[str, Any]) -> ValidationFindingData:
