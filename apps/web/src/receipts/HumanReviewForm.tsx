@@ -114,6 +114,8 @@ export function HumanReviewForm({
     ).discount;
   });
   const [total, setTotal] = useState(() => minorToDollars(rev?.total_minor, dp));
+  const discountIsIncludedInSubtotal =
+    initialCandidatePatch?.kind === "confirm_discount_included_in_subtotal";
 
   const [lineItems, setLineItems] = useState<FormLineItem[]>(() => {
     const items = initialData.line_items;
@@ -381,7 +383,8 @@ export function HumanReviewForm({
           /* ignore */
         }
         if (sub != null || t != null) {
-          const computed = (sub ?? 0) + (t ?? 0) + (ti ?? 0) - (di ?? 0);
+          const appliedDiscount = discountIsIncludedInSubtotal ? 0 : (di ?? 0);
+          const computed = (sub ?? 0) + (t ?? 0) + (ti ?? 0) - appliedDiscount;
           const totalMinor = (() => {
             try {
               return parseDollarsToMinor(total, dp);
@@ -396,6 +399,9 @@ export function HumanReviewForm({
               aria-live="polite"
             >
               Calculated: {formatMinorUnits(computed, currency)}
+              {discountIsIncludedInSubtotal && (
+                <span> · Discount retained as already included in subtotal</span>
+              )}
               {totalMinor != null && !matches && (
                 <span className="form-preview__delta">
                   {" "}

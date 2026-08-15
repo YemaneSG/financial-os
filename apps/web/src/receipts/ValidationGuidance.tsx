@@ -29,6 +29,7 @@ function friendlyFieldName(field: string | null | undefined): string {
 
 function kindLabel(kind: string): string {
   const map: Record<string, string> = {
+    confirm_discount_included_in_subtotal: "Confirm discount is included in subtotal",
     clear_receipt_discount: "Clear duplicate discount",
     use_gross_line_sum_as_subtotal: "Set subtotal from line items",
     use_net_line_sum_as_subtotal: "Set subtotal from net line items",
@@ -57,6 +58,18 @@ function describeCandidate(
       : friendlyFieldName(c.target_field);
   const amountStr =
     c.amount_minor != null ? ` (${formatMinorUnits(c.amount_minor, currency)})` : "";
+  if (c.kind === "clear_receipt_discount") {
+    return `${kindLabel(c.kind)}${amountStr}`;
+  }
+  if (c.kind === "confirm_discount_included_in_subtotal") {
+    return `${kindLabel(c.kind)}${amountStr}`;
+  }
+  if (
+    c.kind === "use_gross_line_sum_as_subtotal" ||
+    c.kind === "use_net_line_sum_as_subtotal"
+  ) {
+    return `${kindLabel(c.kind)}${amountStr}`;
+  }
   return `${kindLabel(c.kind)} on ${target}${amountStr}`;
 }
 
@@ -86,6 +99,8 @@ function formattedComponentEquation(
 
 function candidateReason(c: ReviewCandidate): string {
   const reasons: Record<string, string> = {
+    subtotal_already_includes_receipt_discount:
+      "Subtotal already includes this discount; keep both evidenced values and apply the discount only once",
     receipt_discount_matches_delta: "Receipt discount equals the arithmetic difference",
     gross_line_sum_restores_total: "Sum of line totals restores the receipt total",
     net_line_sum_restores_total: "Net line sum (after discounts) restores the receipt total",

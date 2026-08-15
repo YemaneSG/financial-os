@@ -90,11 +90,32 @@ def run_deterministic_checks(
     return findings
 
 
+def receipt_discount_is_included_in_subtotal(
+    raw: dict[str, Any],
+    tolerance_minor: int = 1,
+) -> bool:
+    """Return true only when complete line evidence proves the discount convention."""
+    subtotal = raw.get("subtotal_minor")
+    discount = raw.get("discount_minor")
+    line_items = raw.get("line_items") or []
+    if subtotal is None or discount is None or discount <= 0 or not line_items:
+        return False
+    if any(item.get("line_total_minor") is None for item in line_items):
+        return False
+
+    gross_sum = sum(item["line_total_minor"] for item in line_items)
+    line_discount_sum = sum(item.get("discount_minor") or 0 for item in line_items)
+    net_before_receipt_discount = gross_sum - line_discount_sum
+    return bool(
+        abs(int(subtotal) - (int(net_before_receipt_discount) - int(discount))) <= tolerance_minor
+    )
+
+
 def _check_totals_arithmetic(
     raw: dict[str, Any],
     tolerance_minor: int,
 ) -> ValidationFindingData:
-    """TOTALS_ARITHMETIC_V1: subtotal + tax + tip - discount ≈ total."""
+    """TOTALS_ARITHMETIC_V2: support separate and evidenced included discounts."""
     sub = raw.get("subtotal_minor")
     tax = raw.get("tax_minor")
     tip = raw.get("tip_minor")
@@ -104,23 +125,40 @@ def _check_totals_arithmetic(
     evidenced = [v for v in [sub, tax, tip, dis, tot] if v is not None]
     if len(evidenced) < 2 or tot is None:
         return ValidationFindingData(
-            check_code="TOTALS_ARITHMETIC_V1",
+            check_code="TOTALS_ARITHMETIC_V2",
             outcome=ValidationOutcome.NOT_APPLICABLE,
             observed={"available_fields": len(evidenced)},
             expected=None,
-            rule_version="1",
+            rule_version="2",
         )
 
-    computed = (sub or 0) + (tax or 0) + (tip or 0) - (dis or 0)
+    separate_discount_computed = (sub or 0) + (tax or 0) + (tip or 0) - (dis or 0)
+    included_discount_computed = (sub or 0) + (tax or 0) + (tip or 0)
+    separate_delta = tot - separate_discount_computed
+    included_delta = tot - included_discount_computed
+    discount_included = receipt_discount_is_included_in_subtotal(raw, tolerance_minor)
+
+    separate_passes = abs(separate_delta) <= tolerance_minor
+    included_passes = discount_included and abs(included_delta) <= tolerance_minor
+    passes = separate_passes or included_passes
+    computed = (
+        separate_discount_computed
+        if separate_passes or not included_passes
+        else included_discount_computed
+    )
     delta = tot - computed
-    passes = abs(delta) <= tolerance_minor
 
     return ValidationFindingData(
-        check_code="TOTALS_ARITHMETIC_V1",
+        check_code="TOTALS_ARITHMETIC_V2",
         outcome=ValidationOutcome.PASS if passes else ValidationOutcome.FAIL,
-        observed={"total_minor": tot, "computed_minor": computed, "delta_minor": delta},
+        observed={
+            "total_minor": tot,
+            "computed_minor": computed,
+            "delta_minor": delta,
+            "discount_included_in_subtotal": discount_included,
+        },
         expected={"tolerance_minor": tolerance_minor},
-        rule_version="1",
+        rule_version="2",
     )
 
 
@@ -190,28 +228,30 @@ def _check_line_item_arithmetic(
 
 
 def _check_line_items_to_subtotal(raw: dict[str, Any]) -> ValidationFindingData:
-    """LINE_ITEMS_TO_SUBTOTAL_V1: subtotal ≈ gross or net line-item sum.
+    """LINE_ITEMS_TO_SUBTOTAL_V2: subtotal matches a supported discount convention.
 
     NOT_APPLICABLE when any existing line item lacks line_total_minor — a partial
-    sum must not be treated as a complete line-item coverage figure.
+    sum must not be treated as a complete line-item coverage figure. V2 adds the
+    retailer convention where a receipt-level discount is already reflected in
+    the displayed subtotal instead of being subtracted after it.
     """
     subtotal = raw.get("subtotal_minor")
     line_items = raw.get("line_items") or []
 
     if subtotal is None or not line_items:
         return ValidationFindingData(
-            check_code="LINE_ITEMS_TO_SUBTOTAL_V1",
+            check_code="LINE_ITEMS_TO_SUBTOTAL_V2",
             outcome=ValidationOutcome.NOT_APPLICABLE,
             observed={"line_count": len(line_items), "subtotal_present": subtotal is not None},
             expected=None,
-            rule_version="1",
+            rule_version="2",
         )
 
     # If ANY line item is missing line_total_minor, coverage is incomplete.
     lines_with_total = [li for li in line_items if li.get("line_total_minor") is not None]
     if len(lines_with_total) != len(line_items):
         return ValidationFindingData(
-            check_code="LINE_ITEMS_TO_SUBTOTAL_V1",
+            check_code="LINE_ITEMS_TO_SUBTOTAL_V2",
             outcome=ValidationOutcome.NOT_APPLICABLE,
             observed={
                 "line_count": len(line_items),
@@ -219,20 +259,25 @@ def _check_line_items_to_subtotal(raw: dict[str, Any]) -> ValidationFindingData:
                 "subtotal_present": True,
             },
             expected=None,
-            rule_version="1",
+            rule_version="2",
         )
 
     gross_sum = sum(li["line_total_minor"] for li in lines_with_total)
     line_discount_sum = sum(li.get("discount_minor") or 0 for li in line_items)
     net_sum = gross_sum - line_discount_sum
+    receipt_discount = raw.get("discount_minor") or 0
+    receipt_adjusted_net_sum = net_sum - receipt_discount
 
     gross_delta = subtotal - gross_sum
     net_delta = subtotal - net_sum
+    receipt_adjusted_net_delta = subtotal - receipt_adjusted_net_sum
     tolerance = 1
 
-    passes = abs(gross_delta) <= tolerance or abs(net_delta) <= tolerance
+    passes = any(
+        abs(delta) <= tolerance for delta in (gross_delta, net_delta, receipt_adjusted_net_delta)
+    )
     return ValidationFindingData(
-        check_code="LINE_ITEMS_TO_SUBTOTAL_V1",
+        check_code="LINE_ITEMS_TO_SUBTOTAL_V2",
         outcome=ValidationOutcome.PASS if passes else ValidationOutcome.FAIL,
         observed={
             "subtotal_minor": subtotal,
@@ -240,9 +285,10 @@ def _check_line_items_to_subtotal(raw: dict[str, Any]) -> ValidationFindingData:
             "net_line_sum_minor": net_sum,
             "gross_delta_minor": gross_delta,
             "net_delta_minor": net_delta,
+            "receipt_adjusted_net_delta_minor": receipt_adjusted_net_delta,
         },
         expected={"tolerance_minor": tolerance},
-        rule_version="1",
+        rule_version="2",
     )
 
 

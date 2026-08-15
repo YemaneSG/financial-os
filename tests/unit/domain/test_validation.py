@@ -56,7 +56,7 @@ class TestDeterministicArithmetic:
     def test_correct_totals_pass(self):
         raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
         findings = run_deterministic_checks(raw)
-        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V1")
+        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V2")
         assert totals_check.outcome == ValidationOutcome.PASS
 
     def test_incorrect_totals_fail(self):
@@ -66,7 +66,7 @@ class TestDeterministicArithmetic:
             total_minor=999,  # wrong
         )
         findings = run_deterministic_checks(raw)
-        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V1")
+        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V2")
         assert totals_check.outcome == ValidationOutcome.FAIL
 
     def test_one_cent_tolerance_passes(self):
@@ -76,14 +76,14 @@ class TestDeterministicArithmetic:
             total_minor=1081,  # 1 cent rounding
         )
         findings = run_deterministic_checks(raw)
-        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V1")
+        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V2")
         assert totals_check.outcome == ValidationOutcome.PASS
 
     def test_totals_not_applicable_when_insufficient_evidence(self):
         raw = make_synthetic_extraction_result()
         raw["total_minor"] = None  # no total evidenced
         findings = run_deterministic_checks(raw)
-        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V1")
+        totals_check = next(f for f in findings if f.check_code == "TOTALS_ARITHMETIC_V2")
         assert totals_check.outcome == ValidationOutcome.NOT_APPLICABLE
 
     def test_line_item_arithmetic_pass(self):
@@ -147,7 +147,7 @@ class TestLineItemsToSubtotalCheck:
         raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
         # Default factory has one line with line_total_minor=subtotal_minor=1000
         findings = run_deterministic_checks(raw)
-        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
         assert check.outcome == ValidationOutcome.PASS
 
     def test_pass_when_subtotal_equals_net_line_sum(self):
@@ -156,29 +156,45 @@ class TestLineItemsToSubtotalCheck:
         raw["line_items"][0]["line_total_minor"] = 1000
         raw["line_items"][0]["discount_minor"] = 100
         findings = run_deterministic_checks(raw)
-        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
         assert check.outcome == ValidationOutcome.PASS
+
+    def test_pass_when_receipt_discount_is_already_in_subtotal(self):
+        """Receipt-level discounts may already be reflected in the displayed subtotal."""
+        raw = make_synthetic_extraction_result(
+            subtotal_minor=21702,
+            tax_minor=198,
+            total_minor=21900,
+        )
+        raw["discount_minor"] = 600
+        raw["line_items"][0]["line_total_minor"] = 22302
+
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
+
+        assert check.outcome == ValidationOutcome.PASS
+        assert check.observed["receipt_adjusted_net_delta_minor"] == 0
 
     def test_fail_when_subtotal_matches_neither_sum(self):
         raw = make_synthetic_extraction_result(subtotal_minor=1200, tax_minor=80, total_minor=1280)
         # line_total_minor defaults to subtotal_minor=1200 from factory... adjust so they differ
         raw["line_items"][0]["line_total_minor"] = 999
         findings = run_deterministic_checks(raw)
-        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
         assert check.outcome == ValidationOutcome.FAIL
 
     def test_not_applicable_when_no_subtotal(self):
         raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
         raw["subtotal_minor"] = None
         findings = run_deterministic_checks(raw)
-        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
         assert check.outcome == ValidationOutcome.NOT_APPLICABLE
 
     def test_not_applicable_when_no_lines_with_totals(self):
         raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
         raw["line_items"][0]["line_total_minor"] = None
         findings = run_deterministic_checks(raw)
-        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
         assert check.outcome == ValidationOutcome.NOT_APPLICABLE
 
     def test_not_applicable_when_partial_line_coverage(self):
@@ -202,7 +218,7 @@ class TestLineItemsToSubtotalCheck:
             },
         ]
         findings = run_deterministic_checks(raw)
-        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V2")
         # Must NOT be FAIL — partial sum of 500 vs subtotal 1000 would be a spurious FAIL
         assert check.outcome == ValidationOutcome.NOT_APPLICABLE, (
             "Partial line coverage must produce NOT_APPLICABLE, not a false FAIL"

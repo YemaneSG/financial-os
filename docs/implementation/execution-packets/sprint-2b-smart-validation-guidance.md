@@ -1,6 +1,6 @@
 # Execution Packet — Sprint 2B Smart Validation Guidance
 
-**Status:** Implemented and locally verified — publication and owner acceptance pending
+**Status:** Deployed — owner-acceptance discount-semantics refinement locally verified and pending publication
 **Packet owner:** Yemane
 **Operating lead:** Codex
 **Implementation lead:** Claude Code through Vertex AI
@@ -299,6 +299,18 @@ synthetic fixtures and perform independent analysis within their boundary.
 ### Residual risks
 1. **No production deploy executed yet** — GitHub CI, production deployment, privacy-safe smoke, and owner acceptance remain the release gates.
 2. **Unique two-line proposal deferred** — safe support needs explicit multi-target evidence and UX. The observed discount workflow and all one-field/one-line hypotheses are complete; no open-ended subset search or speculative double deletion was introduced.
+
+### Owner-acceptance refinement — August 15, 2026
+
+The first production acceptance view correctly explained the discrepancy but
+over-ranked a calculated subtotal replacement. Focused regression proved that
+clearing the receipt discount would also be evidence-destructive: it balanced the
+total while creating a line-sum mismatch. The approved correction uses versioned
+V2 deterministic checks to recognize a discount already included in subtotal
+only when complete line arithmetic proves it. Both subtotal and discount remain
+preserved, historical V1 findings remain readable, and incomplete evidence cannot
+produce a strong recommendation. No migration or contract-breaking change is
+required.
 
 ## 14. Troubleshooting and review limits
 

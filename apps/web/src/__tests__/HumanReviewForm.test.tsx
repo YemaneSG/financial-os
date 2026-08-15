@@ -187,6 +187,45 @@ describe("HumanReviewForm", () => {
     });
   });
 
+  it("previews_an_evidenced_discount_as_already_included_in_subtotal", () => {
+    renderForm(
+      {
+        current_revision: {
+          revision_id: REVISION_ID,
+          source_type: "extractor",
+          merchant_normalized: "Synthetic Store",
+          currency: "USD",
+          subtotal_minor: 21702,
+          tax_minor: 198,
+          discount_minor: 600,
+          total_minor: 21900,
+        },
+        line_items: [
+          {
+            ordinal: 1,
+            raw_description: "Synthetic item",
+            line_total_minor: 22302,
+          },
+        ],
+      },
+      vi.fn((): Promise<void> => Promise.resolve()),
+      vi.fn(),
+      {
+        kind: "confirm_discount_included_in_subtotal",
+        evidence_band: "strong",
+        target_field: "discount_minor",
+        amount_minor: 600,
+        reason_codes: ["subtotal_already_includes_receipt_discount"],
+        equations_before: ["delta(600)"],
+        equations_after: ["delta(0)"],
+        draft_patch: [],
+      },
+    );
+
+    expect(screen.getByText(/Calculated: \$219\.00/i)).toBeInTheDocument();
+    expect(screen.getByText(/discount retained as already included in subtotal/i)).toBeInTheDocument();
+  });
+
   it("calls onCancel when Cancel is clicked", () => {
     const onCancel = vi.fn();
     renderForm({}, vi.fn((): Promise<void> => Promise.resolve()), onCancel);
