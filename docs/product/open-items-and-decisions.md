@@ -32,7 +32,7 @@ Status values:
 | Delivery model | Codex is product/scope/integration decision maker; Claude Code through Vertex AI supervises three independent standard Sonnet workstreams for backend/data, frontend/product, and security/verification. |
 | Troubleshooting policy | Non-blockers: 15-minute diagnosis then document/defer. Blockers: 30 minutes or two materially different attempts, then stop and wait for the owner. No recursive review or debugging loops. |
 | Implementation contract | `docs/implementation/execution-packets/sprint-2a-human-review.md` |
-| Release evidence | Implemented at `b03863c`; CI and deployment passed in GitHub Actions runs `31860806179` and `31860806300`; owner-controlled production correction acceptance remains pending. |
+| Release evidence | Implemented at `b03863c`; CI and deployment passed in GitHub Actions runs `31860806179` and `31860806300`; owner completed a production correction and confirmed human verification. Private receipt values are intentionally omitted. |
 | Rationale | Production capture is working; correction is the smallest next capability that converts uncertain extraction into trusted, analysis-ready data without delaying acquisition. |
 
 This decision authorizes the additive human-review API and production deployment described by the execution packet. It does not authorize new data sources, destructive infrastructure changes, or weakening durability, privacy, or authorization controls.
@@ -53,6 +53,71 @@ This decision authorizes the additive human-review API and production deployment
 This decision approves the name. It does not authorize an unplanned replacement of production infrastructure, deletion of cloud resources, loss of operational history, or a data migration.
 
 ## 3. Open and deferred items
+
+### DT-OPEN-002 — Explainable receipt validation and discount semantics
+
+| Field | Value |
+|---|---|
+| Status | `Open` |
+| Priority | Next recommended product slice |
+| Owner | Codex operating lead |
+| Trigger | Explicit owner approval to start Sprint 2B |
+| Expected size | Small bounded vertical slice; no database migration expected |
+| User impact before completion | Failed checks identify that review is needed but do not explain the exact difference or likely cause clearly enough for a fast human decision. |
+
+#### Owner-observed problem
+
+During Sprint 2A acceptance, a retailer discount appeared to be represented both
+in the extracted subtotal or line items and as a separate receipt-level discount.
+The system correctly detected an arithmetic inconsistency, but the review UI
+showed only a technical check code and outcome. It did not show the equation,
+calculated total, receipt total, difference, or the likely discount interpretation.
+
+No real receipt value or private evidence is recorded in this public artifact.
+
+#### Recommended outcome
+
+Turn every arithmetic review flag into a short, deterministic explanation such
+as: “Receipt total is X; the calculated total is Y; the difference is Z.” When
+the difference equals a captured discount or matches the line-item/subtotal gap,
+show a carefully worded possibility that the discount may already be included.
+Never auto-delete or reinterpret a discount; the owner remains the decision maker.
+
+#### Bounded Sprint 2B scope
+
+1. Extend the owner-only receipt-detail contract to return the already persisted
+   numeric `observed` and `expected` validation evidence using bounded schemas.
+2. Add a deterministic line-item-sum versus subtotal check so the system can
+   distinguish a total-component mismatch from a line-item/subtotal mismatch.
+3. Replace internal-only validation output with plain-language equations,
+   formatted currency differences, affected line numbers, and non-authoritative
+   likely-cause guidance.
+4. Show a live arithmetic preview in the correction form before submission so a
+   proposed edit can be evaluated without a failed save attempt.
+5. Add focused backend, contract, frontend, accessibility, regression, and
+   privacy tests; publish through the existing CI and deployment workflow.
+
+#### Acceptance evidence
+
+- Every failed totals check displays receipt total, calculated total, signed
+  difference, and the components used in the calculation.
+- Every failed line-item check identifies the line and its observed versus
+  calculated amount without exposing internal identifiers.
+- Discount-related guidance is displayed only when proved by deterministic
+  numeric relationships and is labeled as a possibility, not a correction.
+- A reviewer can change or remove a discount and see the new equation before
+  saving.
+- Existing immutable-revision, owner-authorization, exact-money, and stale-write
+  controls remain unchanged and green.
+- No real receipt content, owner identity, or deployment identifier enters source
+  control, logs, screenshots, or test fixtures.
+
+#### Why this is the next easy win
+
+The validator already persists most totals evidence, the review flow already
+exists, and the change requires no new integration, infrastructure, background
+job, model, or data migration. It closes the observed human-decision gap before
+additional receipt automation or new financial sources increase review volume.
 
 ### DT-OPEN-001 — Execute the DollarTrace rename
 

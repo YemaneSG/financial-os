@@ -1,9 +1,9 @@
 # Sprint 2A human review — verification evidence
 
-**Status:** Implemented and deployed; owner-controlled correction acceptance pending
+**Status:** Complete — implemented, deployed, and owner accepted
 **Date:** August 14, 2026
 **Scope:** Owner-only receipt correction and immutable human verification
-**Data policy:** Synthetic fixtures only; private deployment identifiers intentionally omitted
+**Data policy:** Tracked evidence is synthetic or privacy-safe; private values and deployment identifiers are intentionally omitted
 
 ## Observable outcome
 
@@ -85,7 +85,7 @@ test lifecycle completed.
 | Capture/extraction regression | Pass locally | Existing backend and PWA suites remain green |
 | CI dependency/static security gates | Pass | [CI run 31860806179](https://github.com/YemaneSG/financial-os/actions/runs/31860806179) |
 | Production deploy and privacy-safe smoke | Pass | [Deploy run 31860806300](https://github.com/YemaneSG/financial-os/actions/runs/31860806300) |
-| Owner-controlled production correction | Pending | Physical-device acceptance after deployment |
+| Owner-controlled production correction | Pass | Owner corrected and human-verified a real retailer receipt in production; private values intentionally omitted |
 
 ## Bounded troubleshooting record
 
@@ -111,7 +111,9 @@ No blocker exceeded two attempts or the approved troubleshooting budget.
   [run 31860806300](https://github.com/YemaneSG/financial-os/actions/runs/31860806300).
 - PWA deployment: pass — production build, Firebase Hosting publication, and
   deployed security-header validation completed in the same deployment run.
-- Owner acceptance: pending one owner-controlled correction on phone or laptop.
+- Owner acceptance: pass — the owner corrected a production retailer receipt and
+  observed the human-verification outcome. The test also exposed the follow-up
+  explainability gap recorded as `DT-OPEN-002`.
 
 The docs-only closeout commit containing this final publication record has no
 runtime effect and intentionally does not redeploy the already verified release
