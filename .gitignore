@@ -23,6 +23,7 @@ fixtures/private/
 # ── Claude Code local state ────────────────────────────────────────────────────
 .claude/settings.local.json
 .claude/plans/
+.claude/worktrees/
 **/*.jsonl
 !tests/fixtures/**/*.jsonl
 

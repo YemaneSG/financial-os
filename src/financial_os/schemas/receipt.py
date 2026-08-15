@@ -13,6 +13,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from financial_os.domain.states import DeduplicationStatus
+
 _SAFE_FINDING_FIELD_TYPES: dict[str, dict[str, dict[str, tuple[type[object], ...]]]] = {
     "TOTALS_ARITHMETIC_V1": {
         "observed": {
@@ -247,6 +249,8 @@ class ReceiptListItemSchema(BaseModel):
     expected_asset_count: int
     acknowledged_at: datetime | None = None
     created_at: datetime
+    deduplication_status: DeduplicationStatus
+    canonical_receipt_id: UUID | None = None
     current_revision: RevisionSummarySchema | None = None
 
 

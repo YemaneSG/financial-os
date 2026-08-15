@@ -54,6 +54,7 @@ from financial_os.models.extraction import ExtractionRun, LineItemRevision, Rece
 from financial_os.models.findings import ValidationFinding
 from financial_os.models.receipt import ProcessingAttempt, Receipt, ReceiptAsset
 from financial_os.schemas.worker import ProcessReceiptResponse, ReconcileProcessingResponse
+from financial_os.services.dedup import classify_receipt
 from financial_os.services.validation import (
     determine_verification_status,
     run_deterministic_checks,
@@ -590,6 +591,16 @@ async def _run_extraction_pipeline(
             reason_code="validation_checks_complete",
             correlation_id=correlation_id,
         )
+    )
+
+    # ── Deduplication classification (Sprint 2C) ──────────────────────────────
+    await session.flush()
+    await session.refresh(receipt)
+    await classify_receipt(
+        session=session,
+        receipt=receipt,
+        correlation_id=correlation_id,
+        actor_type=ActorType.WORKER,
     )
 
     return "succeeded", None

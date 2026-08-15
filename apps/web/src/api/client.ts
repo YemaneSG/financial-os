@@ -7,6 +7,8 @@ import type {
   ReceiptDetail,
   RetryProcessingResponse,
   DownloadCapabilityResponse,
+  SearchReceiptsRequest,
+  SearchReceiptsResponse,
   ApiError,
   UUID,
 } from "./types";
@@ -122,6 +124,17 @@ export const apiClient = {
       `/api/v1/receipts/${receiptId}/human-revisions`,
       { method: "POST", body: JSON.stringify(req) },
     );
+  },
+
+  /**
+   * Owner-only receipt search. Query in body so merchant/item terms never
+   * enter infrastructure request-URL logs.
+   */
+  searchReceipts(req: SearchReceiptsRequest): Promise<SearchReceiptsResponse> {
+    return request<SearchReceiptsResponse>("/api/v1/receipts/search", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
   },
 };
 

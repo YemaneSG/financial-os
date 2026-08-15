@@ -3,7 +3,7 @@
 **Status:** Approved sequencing baseline  
 **Owner:** Yemane  
 **Created:** August 12, 2026  
-**Last updated:** August 14, 2026
+**Last updated:** August 15, 2026
 
 ## 1. Purpose
 
@@ -76,6 +76,9 @@ The roadmap is model-agnostic and outcome-oriented. Sprint numbers describe sequ
 
 - Background retry and offline-aware queueing beyond the day-one partial-upload retry
 - Image-quality checks and duplicate upload detection
+- Server-side receipt search by merchant and item, with purchase-date, amount,
+  processing, verification, and duplicate filters
+- Purchase-date-first historical organization and stable cursor pagination
 - Confidence and review policy
 - Minimal review queue and correction workflow
 - Correction history and extractor-version tracking
@@ -88,6 +91,10 @@ The roadmap is model-agnostic and outcome-oriented. Sprint numbers describe sequ
 - Low-confidence or arithmetically inconsistent receipts are marked for review without blocking continued capture.
 - System-validated and human-verified records remain distinguishable in storage and analysis.
 - Corrections preserve the original extraction and become auditable training or evaluation evidence.
+- Duplicate evidence remains preserved and linked to a canonical receipt rather
+  than deleted or silently merged.
+- The owner can find a receipt across the complete history without scrolling
+  through every captured card.
 - The regression set measures extraction changes over time.
 
 ### Sprint 3 — Personal transaction and statement spine

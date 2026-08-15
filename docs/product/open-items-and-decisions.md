@@ -20,6 +20,27 @@ Status values:
 
 ## 2. Accepted decisions
 
+### DT-DEC-004 — Sprint 2C combines receipt integrity and discovery
+
+| Field | Decision |
+|---|---|
+| Status | `Accepted — implemented and locally verified; release gates pending` |
+| Decision date | August 15, 2026 |
+| Decision owner | Yemane |
+| Outcome | Detect duplicate receipt evidence before sustained historical scanning creates ambiguous records, and make the complete receipt history searchable and filterable without replacing the existing card presentation. |
+| Duplicate contract | Deduplication is an independent receipt state axis. Exact evidence and sufficiently complete deterministic semantic agreement may identify a confirmed duplicate; incomplete evidence remains suspected. Every artifact and revision is preserved and linked to a canonical root. |
+| Discovery contract | Server-side owner-scoped search covers normalized merchant and canonical item descriptions, effective purchase date, amount, processing, verification, and duplicate state. Historical receipts default to purchase-date order with captured/upload fallback. |
+| Privacy contract | Search terms use a JSON request body and are never logged. Fingerprints, receipt content, amounts, owner identifiers, and canonical links remain private and are not emitted in operational logs or public evidence. |
+| Delivery model | Codex freezes contracts and integrates. Two independent Claude Code Sonnet workstreams implement integrity and discovery in isolated worktrees; Codex owns shared-file integration, release verification, and deployment. |
+| Troubleshooting policy | At most 30 minutes per issue. Record and continue past non-blockers; stop for the owner only when a blocker prevents safe correctness or release. |
+| Implementation contract | `docs/implementation/execution-packets/sprint-2c-receipt-integrity-discovery.md` |
+| Local verification | `docs/implementation/evidence/sprint-2c-receipt-integrity-discovery-2026-08-15.md` |
+| Scope boundary | No evidence deletion, automatic merge, perceptual hashing, saved-search system, analytics, data-source integration, transaction matching, or DollarTrace rename. |
+
+This decision records the approved backend and mobile experience as one bounded
+Sprint 2 slice. Search and duplicate classification remain independent of future
+receipt-to-transaction and cross-source matching.
+
 ### DT-DEC-003 — Mobile correction actions remain continuously reachable
 
 | Field | Decision |
