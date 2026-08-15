@@ -54,14 +54,27 @@ jobs:
         run: |
           set -euo pipefail
           job_name="financial-os-${ENVIRONMENT}-migrate"
+          command_state="$(
+            gcloud run jobs describe "${job_name}" \
+              --project="${GCP_PROJECT_ID}" \
+              --region="${REGION}" \
+              --format='csv[no-heading](spec.template.template.containers[0].command,spec.template.template.containers[0].args)' \
+              2>/dev/null
+          )"
+          if [[ "${command_state}" != *alembic* || "${command_state}" != *upgrade* || "${command_state}" != *head* ]]; then
+            echo "::error::Migration command preflight failed; no override was attempted."
+            exit 1
+          fi
+
           if ! gcloud run jobs update "${job_name}" \
             --project="${GCP_PROJECT_ID}" \
             --region="${REGION}" \
+            --quiet \
+            --format=none \
             --container=migrate \
             --command=python \
             --args=-m,financial_os.operations.backfill_dedup,--batch-size,50 \
-            --quiet \
-            --format=none >/dev/null 2>&1; then
+            >/dev/null 2>&1; then
             echo "::error::Could not configure the one-shot backfill command."
             exit 1
           fi
@@ -114,11 +127,12 @@ jobs:
           if ! gcloud run jobs update "${job_name}" \
             --project="${GCP_PROJECT_ID}" \
             --region="${REGION}" \
+            --quiet \
+            --format=none \
             --container=migrate \
             --command=alembic \
             --args=upgrade,head \
-            --quiet \
-            --format=none >/dev/null 2>&1; then
+            >/dev/null 2>&1; then
             echo "::error::Failed to restore the migration command."
             exit 1
           fi
