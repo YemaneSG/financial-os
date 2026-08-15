@@ -71,10 +71,18 @@ class ValidationOutcome(StrEnum):
     NOT_APPLICABLE = "not_applicable"
 
 
+class DeduplicationStatus(StrEnum):
+    UNCHECKED = "unchecked"
+    UNIQUE = "unique"
+    SUSPECTED_DUPLICATE = "suspected_duplicate"
+    CONFIRMED_DUPLICATE = "confirmed_duplicate"
+
+
 class StateEventDimension(StrEnum):
     PROCESSING = "processing"
     VERIFICATION = "verification"
     FINANCIAL_CONTEXT = "financial_context"
+    DEDUPLICATION = "deduplication"
 
 
 class ActorType(StrEnum):

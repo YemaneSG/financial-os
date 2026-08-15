@@ -23,7 +23,7 @@ class StateEvent(Base):
     __tablename__ = "state_events"
     __table_args__ = (
         CheckConstraint(
-            "dimension IN ('processing','verification','financial_context')",
+            "dimension IN ('processing','verification','financial_context','deduplication')",
             name="ck_event_dimension",
         ),
         CheckConstraint(

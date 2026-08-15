@@ -49,6 +49,11 @@ class Receipt(Base):
             name="ck_receipt_financial_context",
         ),
         CheckConstraint("expected_asset_count > 0", name="ck_receipt_expected_asset_count"),
+        CheckConstraint(
+            "deduplication_status IN ("
+            "'unchecked','unique','suspected_duplicate','confirmed_duplicate')",
+            name="ck_receipt_deduplication_status",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -76,6 +81,28 @@ class Receipt(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    # ── Deduplication axis (Sprint 2C, migration 002) ─────────────────────────
+    deduplication_status: Mapped[str] = mapped_column(
+        Text, nullable=False, default="unchecked", server_default="unchecked"
+    )
+    canonical_receipt_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "receipts.id",
+            use_alter=True,
+            name="fk_receipt_canonical",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+    )
+    evidence_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    semantic_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    deduplication_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deduplication_rule_version: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deduplication_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     assets: Mapped[list[ReceiptAsset]] = relationship(

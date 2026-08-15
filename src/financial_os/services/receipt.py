@@ -48,6 +48,7 @@ from financial_os.models.events import StateEvent
 from financial_os.models.receipt import ProcessingAttempt, Receipt, ReceiptAsset
 from financial_os.schemas import receipt as rschemas
 from financial_os.schemas.common import ALLOWED_ASSET_MIME_TYPES, detect_mime_from_magic
+from financial_os.services.dedup import classify_receipt
 
 if TYPE_CHECKING:
     from financial_os.config import Settings
@@ -354,6 +355,15 @@ async def finalize_receipt(
         )
     )
     await session.flush()
+
+    # Exact evidence deduplication is available as soon as verified assets are
+    # durable. Semantic classification runs again after extraction.
+    await classify_receipt(
+        session=session,
+        receipt=receipt,
+        correlation_id=correlation_id,
+        actor_type=ActorType.API,
+    )
 
     # Enqueue task (best-effort; reconciliation sweep repairs missed tasks).
     attempt_number = 1
@@ -1017,6 +1027,15 @@ async def create_human_revision(
 
     # 6f. Flush to DB — does NOT commit (router commits).
     await session.flush()
+
+    # 6g. Re-run deduplication after human correction (semantic fingerprint may change).
+    await session.refresh(receipt)
+    await classify_receipt(
+        session=session,
+        receipt=receipt,
+        correlation_id=correlation_id,
+        actor_type=ActorType.USER,
+    )
 
     # Step 7: return fresh ReceiptDetailSchema from the same session.
     return await get_receipt(session=session, owner=owner, receipt_id=receipt_id, settings=settings)
