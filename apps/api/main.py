@@ -32,7 +32,7 @@ from financial_os.domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from financial_os.routers import health, receipts, worker
+from financial_os.routers import health, receipts, search, worker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -192,6 +192,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Include routers.
     app.include_router(health.router)
     app.include_router(receipts.router)
+    app.include_router(search.router)
     app.include_router(worker.router)
 
     return app

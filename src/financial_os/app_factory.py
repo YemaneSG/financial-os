@@ -31,7 +31,7 @@ from financial_os.domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from financial_os.routers import health, receipts, worker
+from financial_os.routers import health, receipts, search, worker
 
 
 def create_test_app(
@@ -117,6 +117,7 @@ def create_test_app(
 
     app.include_router(health.router)
     app.include_router(receipts.router)
+    app.include_router(search.router)
     app.include_router(worker.router)
 
     return app

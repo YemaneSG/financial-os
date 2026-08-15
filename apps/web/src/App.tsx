@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { SignInScreen } from "@/auth/SignInScreen";
 import { CapturePage } from "@/receipts/CapturePage";
-import { RecentReceipts } from "@/receipts/RecentReceipts";
+import { ReceiptsDiscovery } from "@/receipts/ReceiptsDiscovery";
 import { ReceiptDetailPage } from "@/receipts/ReceiptDetail";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -37,7 +37,7 @@ function AppRoutes() {
         path="/receipts"
         element={
           <RequireAuth>
-            <RecentReceipts />
+            <ReceiptsDiscovery />
           </RequireAuth>
         }
       />

@@ -130,6 +130,8 @@ export interface ReceiptListItem {
   acknowledged_at?: string | null;
   created_at: Timestamp;
   current_revision?: RevisionSummary | null;
+  deduplication_status?: DeduplicationStatus;
+  canonical_receipt_id?: UUID | null;
 }
 
 export interface ReceiptDetail extends ReceiptListItem {
@@ -213,4 +215,48 @@ export interface ApiError {
   error_code: string;
   message: string;
   request_id?: string | null;
+}
+
+// ── Discovery / Search types ──────────────────────────────────────────────────
+
+export type DeduplicationStatus =
+  | "unchecked"
+  | "unique"
+  | "suspected_duplicate"
+  | "confirmed_duplicate";
+
+export type SearchSortOrder =
+  | "effective_date_desc"
+  | "effective_date_asc"
+  | "amount_desc"
+  | "amount_asc";
+
+export interface MatchContext {
+  source: "merchant" | "line_item";
+  matched_description?: string | null;
+}
+
+export interface SearchReceiptItem extends ReceiptListItem {
+  captured_at?: string | null;
+  match_context?: MatchContext | null;
+}
+
+export interface SearchReceiptsRequest {
+  query?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  amount_min_minor?: number | null;
+  amount_max_minor?: number | null;
+  processing_status?: ProcessingStatus[];
+  verification_status?: VerificationStatus[];
+  deduplication_status?: DeduplicationStatus[];
+  sort?: SearchSortOrder;
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface SearchReceiptsResponse {
+  receipts: SearchReceiptItem[];
+  total_count: number;
+  next_cursor?: string | null;
 }
