@@ -54,14 +54,16 @@ jobs:
         run: |
           set -euo pipefail
           job_name="financial-os-${ENVIRONMENT}-migrate"
-          command_state="$(
+          job_export="$(
             gcloud run jobs describe "${job_name}" \
               --project="${GCP_PROJECT_ID}" \
               --region="${REGION}" \
-              --format='csv[no-heading](spec.template.template.containers[0].command,spec.template.template.containers[0].args)' \
+              --format=export \
               2>/dev/null
           )"
-          if [[ "${command_state}" != *alembic* || "${command_state}" != *upgrade* || "${command_state}" != *head* ]]; then
+          if ! grep -Eq '^[[:space:]]*-[[:space:]]+alembic[[:space:]]*$' <<<"${job_export}" \
+            || ! grep -Eq '^[[:space:]]*-[[:space:]]+upgrade[[:space:]]*$' <<<"${job_export}" \
+            || ! grep -Eq '^[[:space:]]*-[[:space:]]+head[[:space:]]*$' <<<"${job_export}"; then
             echo "::error::Migration command preflight failed; no override was attempted."
             exit 1
           fi
@@ -137,14 +139,16 @@ jobs:
             exit 1
           fi
 
-          command_state="$(
+          job_export="$(
             gcloud run jobs describe "${job_name}" \
               --project="${GCP_PROJECT_ID}" \
               --region="${REGION}" \
-              --format='csv[no-heading](spec.template.template.containers[0].command,spec.template.template.containers[0].args)' \
+              --format=export \
               2>/dev/null
           )"
-          if [[ "${command_state}" != *alembic* || "${command_state}" != *upgrade* || "${command_state}" != *head* ]]; then
+          if ! grep -Eq '^[[:space:]]*-[[:space:]]+alembic[[:space:]]*$' <<<"${job_export}" \
+            || ! grep -Eq '^[[:space:]]*-[[:space:]]+upgrade[[:space:]]*$' <<<"${job_export}" \
+            || ! grep -Eq '^[[:space:]]*-[[:space:]]+head[[:space:]]*$' <<<"${job_export}"; then
             echo "::error::Migration command restoration could not be verified."
             exit 1
           fi
