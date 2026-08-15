@@ -1,0 +1,137 @@
+name: One-time receipt deduplication backfill
+
+# Temporary release workflow for Sprint 2C. Remove immediately after the
+# successful run is recorded. It starts only after the normal Deploy workflow
+# has completed successfully on main.
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: us-central1
+  ENVIRONMENT: dev
+
+jobs:
+  backfill:
+    name: Dry run → apply → verify convergence
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: receipt-deduplication-backfill-dev
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Authenticate to GCP (WIF)
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        id: setup
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Configure one-shot backfill command
+        id: configure
+        shell: bash
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          job_name="financial-os-${ENVIRONMENT}-migrate"
+          if ! gcloud run jobs update "${job_name}" \
+            --project="${GCP_PROJECT_ID}" \
+            --region="${REGION}" \
+            --container=migrate \
+            --command=python \
+            --args=-m,financial_os.operations.backfill_dedup,--batch-size,50 \
+            --quiet \
+            --format=none >/dev/null 2>&1; then
+            echo "::error::Could not configure the one-shot backfill command."
+            exit 1
+          fi
+          echo "One-shot backfill command configured."
+
+      - name: Dry run, apply, and verify convergence
+        shell: bash
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          job_name="financial-os-${ENVIRONMENT}-migrate"
+
+          execute_backfill() {
+            local execution_args="$1"
+
+            if ! gcloud run jobs execute "${job_name}" \
+              --project="${GCP_PROJECT_ID}" \
+              --region="${REGION}" \
+              --args="${execution_args}" \
+              --wait \
+              --quiet \
+              --format=none >/dev/null 2>&1; then
+              echo "::error::The one-shot backfill execution failed." >&2
+              return 1
+            fi
+          }
+
+          echo "Running rollback-only dry run."
+          execute_backfill '-m,financial_os.operations.backfill_dedup,--batch-size,50'
+          echo "Rollback-only dry run completed."
+
+          echo "Dry run accepted; applying bounded batches."
+          execute_backfill '-m,financial_os.operations.backfill_dedup,--apply,--batch-size,50'
+          echo "Bounded apply completed."
+
+          echo "Verifying idempotent convergence."
+          execute_backfill '-m,financial_os.operations.backfill_dedup,--batch-size,50,--require-zero'
+
+          echo "Backfill applied and converged."
+
+      - name: Restore migration command
+        if: ${{ always() && steps.auth.outcome == 'success' && steps.setup.outcome == 'success' }}
+        shell: bash
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          job_name="financial-os-${ENVIRONMENT}-migrate"
+          if ! gcloud run jobs update "${job_name}" \
+            --project="${GCP_PROJECT_ID}" \
+            --region="${REGION}" \
+            --container=migrate \
+            --command=alembic \
+            --args=upgrade,head \
+            --quiet \
+            --format=none >/dev/null 2>&1; then
+            echo "::error::Failed to restore the migration command."
+            exit 1
+          fi
+
+          command_state="$(
+            gcloud run jobs describe "${job_name}" \
+              --project="${GCP_PROJECT_ID}" \
+              --region="${REGION}" \
+              --format='csv[no-heading](spec.template.template.containers[0].command,spec.template.template.containers[0].args)' \
+              2>/dev/null
+          )"
+          if [[ "${command_state}" != *alembic* || "${command_state}" != *upgrade* || "${command_state}" != *head* ]]; then
+            echo "::error::Migration command restoration could not be verified."
+            exit 1
+          fi
+          echo "Migration command restored and verified."

@@ -4,7 +4,8 @@ Run as a one-shot pre-deploy step after migration 002 is applied.
 Default mode is dry-run: prints privacy-safe aggregate counts without writing.
 
 Usage:
-    python -m financial_os.operations.backfill_dedup [--apply] [--batch-size N] [--limit N]
+    python -m financial_os.operations.backfill_dedup
+        [--apply] [--batch-size N] [--limit N] [--require-zero]
 
 Outputs only privacy-safe aggregate counts. No merchant names, amounts, fingerprints,
 owner identifiers, or receipt text appear in any output (AGENTS.md §7).
@@ -149,11 +150,20 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Maximum receipts to evaluate (for bounded runs).",
     )
+    parser.add_argument(
+        "--require-zero",
+        action="store_true",
+        default=False,
+        help="Exit non-zero when a dry run finds any unchecked extracted receipts.",
+    )
     return parser
 
 
 async def main() -> int:
     args = _build_parser().parse_args()
+    if args.apply and args.require_zero:
+        logger.error("--require-zero is valid only in rollback-only dry-run mode")
+        return 2
     dry_run = not args.apply
 
     database_url = os.environ.get("DATABASE_URL")
@@ -193,6 +203,9 @@ async def main() -> int:
         f"  Suspected duplicate: {counts.get('suspected_duplicate', 0)}\n"
         f"  Confirmed duplicate: {counts.get('confirmed_duplicate', 0)}\n"
     )
+    if args.require_zero and counts["evaluated"] != 0:
+        logger.error("Backfill convergence check failed: unchecked receipts remain")
+        return 2
     return 0
 
 

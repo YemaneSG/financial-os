@@ -57,6 +57,8 @@ the earliest acknowledged timestamp and UUID tie-break.
 
 1. Rerun the dry-run command. The evaluated count should be zero unless new
    unchecked extracted receipts arrived during the operation.
+   In automation, add `--require-zero`; it exits nonzero if any unchecked
+   extracted receipt remains and is incompatible with `--apply`.
 2. Query privacy-safe aggregates only: counts by deduplication status and count
    of confirmed duplicates whose canonical pointer is null or self-referential.
    The invalid-pointer count must be zero.
