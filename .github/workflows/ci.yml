@@ -207,6 +207,9 @@ jobs:
   secret-scan:
     name: Secret and private-data scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
