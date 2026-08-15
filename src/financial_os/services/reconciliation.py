@@ -9,7 +9,7 @@ No receipt text appears in the output — amounts and ordinals only.
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from financial_os.domain.money import minor_unit_exponent
 from financial_os.domain.states import ValidationOutcome
@@ -19,7 +19,12 @@ from financial_os.schemas.receipt import (
     ReviewGuidanceSchema,
 )
 
-_MATERIAL_CHECKS = {"TOTALS_ARITHMETIC_V1", "LINE_ITEMS_TO_SUBTOTAL_V1"}
+_MATERIAL_CHECKS = {
+    "TOTALS_ARITHMETIC_V1",
+    "TOTALS_ARITHMETIC_V2",
+    "LINE_ITEMS_TO_SUBTOTAL_V1",  # Stored historical findings.
+    "LINE_ITEMS_TO_SUBTOTAL_V2",
+}
 _TOLERANCE = 1
 
 
@@ -36,6 +41,7 @@ class _CandidateData(TypedDict):
     reason_codes: list[str]
     equations_before: list[str]
     equations_after: list[str]
+    strong_eligible: NotRequired[bool]
 
 
 def compute_review_guidance(
@@ -193,12 +199,67 @@ def _generate_candidates(
     line_items = raw.get("line_items") or []
     multiplier = Decimal(10) ** minor_unit_exponent(currency)
 
+    # --- Rule 0: Preserve values and confirm an evidenced discount convention ---
+    subtotal_includes_receipt_discount = (
+        dis is not None
+        and dis > 0
+        and sub is not None
+        and net_line_sum is not None
+        and abs(sub - (net_line_sum - dis)) <= _TOLERANCE
+        and abs(total - ((sub or 0) + (tax or 0) + (tip or 0))) <= _TOLERANCE
+    )
+    if subtotal_includes_receipt_discount:
+        candidates.append(
+            {
+                "kind": "confirm_discount_included_in_subtotal",
+                "patches": [],
+                # Existing receipts can carry a stored V1 failure. V2 proves the
+                # same immutable values are internally consistent.
+                "equations_restored": 1,
+                "remaining_fails": 0,
+                "abs_match": True,
+                "keyword_support": True,
+                "target_field": "discount_minor",
+                "target_item_ordinal": None,
+                "amount_minor": cast(int, dis),
+                "reason_codes": ["subtotal_already_includes_receipt_discount"],
+                "equations_before": [
+                    f"subtotal({sub}) + tax({tax or 0}) + tip({tip or 0}) "
+                    f"- discount({dis}) = {total - signed_delta}"
+                ],
+                "equations_after": [
+                    f"subtotal({sub}) = net_line_sum({net_line_sum}) - receipt_discount({dis})",
+                    f"subtotal({sub}) + tax({tax or 0}) + tip({tip or 0}) = total({total})",
+                ],
+                "strong_eligible": True,
+            }
+        )
+
     # --- Rule 1: Clear duplicated receipt discount ---
     if dis is not None and dis > 0 and abs(abs_delta - dis) <= _TOLERANCE:
+        supported_line_sums = (
+            [gross_line_sum, net_line_sum, net_line_sum - dis]
+            if gross_line_sum is not None and net_line_sum is not None
+            else []
+        )
+        has_complete_line_support = sub is not None and any(
+            abs(sub - supported_sum) <= _TOLERANCE for supported_sum in supported_line_sums
+        )
+        subtotal_includes_receipt_discount = (
+            sub is not None
+            and net_line_sum is not None
+            and abs(sub - (net_line_sum - dis)) <= _TOLERANCE
+        )
         patches = [DraftPatchSchema(op="clear_receipt_discount")]
         eq_before = [f"total({total}) - computed({total - signed_delta}) = delta({signed_delta})"]
         new_computed = (sub or 0) + (tax or 0) + (tip or 0)
         eq_after = [f"total({total}) - computed({new_computed}) = delta({total - new_computed})"]
+        reason_codes = ["receipt_discount_matches_delta"]
+        if subtotal_includes_receipt_discount:
+            reason_codes.insert(0, "subtotal_already_includes_receipt_discount")
+            eq_after.append(
+                f"subtotal({sub}) = net_line_sum({net_line_sum}) - receipt_discount({dis})"
+            )
         scores, remaining = _simulate_and_score(raw, patches)
         candidates.append(
             {
@@ -211,9 +272,12 @@ def _generate_candidates(
                 "target_field": "discount_minor",
                 "target_item_ordinal": None,
                 "amount_minor": dis,
-                "reason_codes": ["receipt_discount_matches_delta"],
+                "reason_codes": reason_codes,
                 "equations_before": eq_before,
                 "equations_after": eq_after,
+                # An amount match without complete line coverage remains a possible
+                # explanation, not a strong recommendation.
+                "strong_eligible": has_complete_line_support,
             }
         )
 
@@ -382,16 +446,45 @@ def _rank_candidates(
     if not candidates:
         return []
 
-    # Sort by: equations_restored desc, remaining_fails asc, keyword_support desc,
-    # edit_count asc, kind asc (stable deterministic tie-break).
+    def semantic_support(c: _CandidateData) -> int:
+        return int("subtotal_already_includes_receipt_discount" in c["reason_codes"])
+
+    def evidence_mutation_cost(c: _CandidateData) -> int:
+        """Prefer preserving observed summary fields when equations are equivalent."""
+        return {
+            "confirm_discount_included_in_subtotal": 0,
+            "clear_receipt_discount": 1,
+            "clear_line_discount": 1,
+            "replace_line_total_with_qty_price": 2,
+            "use_gross_line_sum_as_subtotal": 2,
+            "use_net_line_sum_as_subtotal": 2,
+            "remove_line_item": 3,
+        }.get(c["kind"], len(c["patches"]))
+
+    def evidence_tier(c: _CandidateData) -> tuple[int, int, int, int, int, int]:
+        """Evidence score excluding stable presentation tie-breakers."""
+        return (
+            c["equations_restored"],
+            -c["remaining_fails"],
+            semantic_support(c),
+            -evidence_mutation_cost(c),
+            int(c["keyword_support"]),
+            -len(c["patches"]),
+        )
+
+    # Sort by restoration, semantic support, evidence mutation cost, then stable
+    # deterministic presentation fields.
     def sort_key(
         c: _CandidateData,
-    ) -> tuple[int, int, int, int, str, int, tuple[tuple[str, int, int], ...]]:
+    ) -> tuple[int, int, int, int, int, int, str, int, tuple[tuple[str, int, int], ...]]:
+        tier = evidence_tier(c)
         return (
-            -c["equations_restored"],
-            c["remaining_fails"],
-            -int(c["keyword_support"]),
-            len(c["patches"]),
+            -tier[0],
+            -tier[1],
+            -tier[2],
+            -tier[3],
+            -tier[4],
+            -tier[5],
             c["kind"],  # stable alphabetic tie-break
             c.get("target_item_ordinal") or 0,
             tuple((patch.op, patch.ordinal or 0, patch.value or 0) for patch in c["patches"]),
@@ -399,23 +492,30 @@ def _rank_candidates(
 
     sorted_cands = sorted(candidates, key=sort_key)
 
-    # Identify fully-restoring candidates (equations_restored > 0, remaining_fails == 0).
-    # If more than one candidate achieves full restoration at the same tier, ALL such
-    # candidates are ambiguous — the UI must present them without silent selection.
+    # Only evidence-supported, fully-restoring candidates may be strong. If more
+    # than one candidate has the same complete evidence tier, all top candidates
+    # are ambiguous. A lower-evidence arithmetic solution remains possible.
     fully_restoring = [
-        c for c in sorted_cands if c["equations_restored"] > 0 and c["remaining_fails"] == 0
+        c
+        for c in sorted_cands
+        if c["equations_restored"] > 0
+        and c["remaining_fails"] == 0
+        and c.get("strong_eligible", True)
     ]
-    top_restoration = fully_restoring[0]["equations_restored"] if fully_restoring else 0
-    top_tier_tied = [c for c in fully_restoring if c["equations_restored"] == top_restoration]
-    is_ambiguous_top = len(top_tier_tied) > 1
+    top_tier = evidence_tier(fully_restoring[0]) if fully_restoring else None
+    top_tier_tied = [c for c in fully_restoring if evidence_tier(c) == top_tier]
 
     result: list[ReviewCandidateSchema] = []
     for c in sorted_cands[:3]:
-        if c["equations_restored"] > 0 and c["remaining_fails"] == 0:
-            if is_ambiguous_top and c["equations_restored"] == top_restoration:
+        is_fully_restoring = c["equations_restored"] > 0 and c["remaining_fails"] == 0
+        is_top_tier = top_tier is not None and evidence_tier(c) == top_tier
+        if is_fully_restoring and c.get("strong_eligible", True):
+            if is_top_tier and len(top_tier_tied) > 1:
                 band: Literal["strong", "possible", "ambiguous"] = "ambiguous"
-            else:
+            elif is_top_tier:
                 band = "strong"
+            else:
+                band = "possible"
         elif c["abs_match"]:
             band = "possible"
         else:

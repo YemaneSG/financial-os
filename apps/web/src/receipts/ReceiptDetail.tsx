@@ -174,7 +174,9 @@ export function ReceiptDetailPage() {
               receipt.validation_findings?.some(
                 (f) =>
                   (f.check_code === "TOTALS_ARITHMETIC_V1" ||
-                    f.check_code === "LINE_ITEMS_TO_SUBTOTAL_V1") &&
+                    f.check_code === "TOTALS_ARITHMETIC_V2" ||
+                    f.check_code === "LINE_ITEMS_TO_SUBTOTAL_V1" ||
+                    f.check_code === "LINE_ITEMS_TO_SUBTOTAL_V2") &&
                   f.outcome === "fail",
               ) && (
                 <p

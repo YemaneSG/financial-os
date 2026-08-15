@@ -260,9 +260,9 @@ class TestConfirmedAsShownDisposition:
         # The new human revision must carry validation findings (including the failure).
         assert data.get("validation_findings") is not None
         human_findings = data["validation_findings"]
-        totals_findings = [f for f in human_findings if f["check_code"] == "TOTALS_ARITHMETIC_V1"]
+        totals_findings = [f for f in human_findings if f["check_code"] == "TOTALS_ARITHMETIC_V2"]
         assert len(totals_findings) >= 1, (
-            "human revision should have a TOTALS_ARITHMETIC_V1 finding"
+            "human revision should have a TOTALS_ARITHMETIC_V2 finding"
         )
         # At least one of those findings should be 'fail' (exception preserved)
         fail_findings = [f for f in totals_findings if f["outcome"] == "fail"]

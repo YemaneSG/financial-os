@@ -58,7 +58,7 @@ This decision approves the name. It does not authorize an unplanned replacement 
 
 | Field | Value |
 |---|---|
-| Status | `In progress — implementation and local verification complete; release and owner acceptance pending` |
+| Status | `In progress — initial release deployed; owner-acceptance refinement locally verified and pending publication` |
 | Priority | Current bounded product slice |
 | Owner | Codex operating lead |
 | Trigger | Owner approved Sprint 2B subject to the smart-guidance design recorded below; implementation begins only after the research proposal handback |
@@ -82,6 +82,22 @@ removal only when simulation restores a material equation. A two-line deletion
 requires additional evidence and UI targeting to avoid presenting a coincidental
 or destructive suggestion; it is not needed for the observed discount case and
 does not block Sprint 2B release.
+
+#### Owner-acceptance checkpoint — August 15, 2026
+
+The deployed explanation correctly found the exact discount relationship, but it
+ranked replacing the evidenced subtotal above preserving the receipt values.
+Focused regression then disproved the initially considered clear-discount fix:
+that edit balanced the total while creating a line-item/subtotal mismatch and
+discarding discount evidence.
+
+The accepted refinement recognizes two retailer discount conventions using
+versioned deterministic checks. When complete line arithmetic proves the discount
+is already included in subtotal, the strong action preserves both values and
+confirms that interpretation; the live preview applies the discount once. Partial
+line coverage cannot support a strong recommendation, and equally supported
+choices remain ambiguous. Historical V1 findings stay readable. No migration,
+provider, or infrastructure change is introduced.
 
 #### Owner-observed problem
 

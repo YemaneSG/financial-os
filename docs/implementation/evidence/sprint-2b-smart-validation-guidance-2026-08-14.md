@@ -98,6 +98,36 @@ No issue exceeded two materially distinct attempts or the approved time budget.
 
 ## Publication record
 
-Pending commit, GitHub CI, production deployment, privacy-safe smoke, and owner
-acceptance. This section will be closed with immutable run references after the
-release gates complete.
+The initial Sprint 2B implementation was merged at `40e52ff` through pull request
+`#6`. Main CI run `31882639163` and deployment run `31882639068` passed, including
+migration, candidate readiness, API and worker traffic switches, Firebase Hosting,
+and deployed security-header verification.
+
+## Owner-acceptance refinement — August 15, 2026
+
+Owner acceptance demonstrated that a gross line sum, a displayed subtotal, and a
+receipt-level discount can support two retailer conventions. The first production
+ranking preferred replacing the subtotal because that restored both legacy
+equations. A proposed alternative that simply cleared the discount failed a
+focused regression: it balanced the receipt total but created a line-sum mismatch
+and discarded useful discount evidence.
+
+The bounded correction therefore preserves both observed values:
+
+- `TOTALS_ARITHMETIC_V2` and `LINE_ITEMS_TO_SUBTOTAL_V2` recognize a receipt-level
+  discount already included in the displayed subtotal only when complete line
+  arithmetic proves that convention.
+- Historical V1 findings remain readable and can receive a strong, no-value-change
+  `confirm_discount_included_in_subtotal` interpretation proposal.
+- The live preview applies the discount exactly once while retaining both values.
+- An exact discount amount without complete line coverage cannot be strong.
+- Equally supported top-tier corrections remain ambiguous; a calculated subtotal
+  replacement cannot outrank a semantics-supported evidence-preserving choice.
+
+No real receipt values, merchant content, or private evidence are recorded here.
+Focused verification passed 58 backend reconciliation/validation tests and 49
+frontend guidance/form tests. The complete local backend regression passed with
+only expected environment-dependent skips; Ruff, formatting, Mypy, ESLint,
+TypeScript, all 138 frontend tests, the production PWA build, OpenAPI validation,
+and private-data scanning passed. Database-backed CI, publication, and the repeated
+owner acceptance check remain pending for this correction.

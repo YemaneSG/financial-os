@@ -23,6 +23,16 @@ _SAFE_FINDING_FIELD_TYPES: dict[str, dict[str, dict[str, tuple[type[object], ...
         },
         "expected": {"tolerance_minor": (int,)},
     },
+    "TOTALS_ARITHMETIC_V2": {
+        "observed": {
+            "available_fields": (int,),
+            "total_minor": (int,),
+            "computed_minor": (int,),
+            "delta_minor": (int,),
+            "discount_included_in_subtotal": (bool,),
+        },
+        "expected": {"tolerance_minor": (int,)},
+    },
     "LINE_ITEM_ARITHMETIC_V1": {
         "observed": {
             "ordinal": (int,),
@@ -42,6 +52,20 @@ _SAFE_FINDING_FIELD_TYPES: dict[str, dict[str, dict[str, tuple[type[object], ...
             "net_line_sum_minor": (int,),
             "gross_delta_minor": (int,),
             "net_delta_minor": (int,),
+        },
+        "expected": {"tolerance_minor": (int,)},
+    },
+    "LINE_ITEMS_TO_SUBTOTAL_V2": {
+        "observed": {
+            "line_count": (int,),
+            "lines_with_total": (int,),
+            "subtotal_present": (bool,),
+            "subtotal_minor": (int,),
+            "gross_line_sum_minor": (int,),
+            "net_line_sum_minor": (int,),
+            "gross_delta_minor": (int,),
+            "net_delta_minor": (int,),
+            "receipt_adjusted_net_delta_minor": (int,),
         },
         "expected": {"tolerance_minor": (int,)},
     },

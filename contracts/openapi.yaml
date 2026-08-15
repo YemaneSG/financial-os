@@ -416,8 +416,9 @@ components:
           maxLength: 100
           description: >
             Machine-readable proposal kind, e.g. clear_receipt_discount,
-            use_gross_line_sum_as_subtotal, clear_line_discount, replace_line_total,
-            remove_line_item, line_pair_adjustment.
+            confirm_discount_included_in_subtotal, use_gross_line_sum_as_subtotal,
+            clear_line_discount, replace_line_total, remove_line_item, or
+            line_pair_adjustment.
         evidence_band:
           type: string
           enum: [strong, possible, ambiguous]

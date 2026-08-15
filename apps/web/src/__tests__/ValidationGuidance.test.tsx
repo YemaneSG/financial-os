@@ -165,6 +165,37 @@ describe("ValidationGuidance", () => {
     ).toBeInTheDocument();
   });
 
+  it("explains_when_the_subtotal_already_includes_the_discount", () => {
+    const supportedCandidate: ReviewCandidate = {
+      ...syntheticCandidate,
+      reason_codes: [
+        "subtotal_already_includes_receipt_discount",
+        "receipt_discount_matches_delta",
+      ],
+    };
+    renderGuidance({ review_candidates: [supportedCandidate] });
+
+    expect(
+      screen.getByText(/subtotal already includes this discount/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Clear duplicate discount \(\$2\.00\)$/i)).toBeInTheDocument();
+  });
+
+  it("presents_the_evidence_preserving_discount_interpretation", () => {
+    const interpretationCandidate: ReviewCandidate = {
+      ...syntheticCandidate,
+      kind: "confirm_discount_included_in_subtotal",
+      reason_codes: ["subtotal_already_includes_receipt_discount"],
+      draft_patch: [],
+    };
+    renderGuidance({ review_candidates: [interpretationCandidate] });
+
+    expect(
+      screen.getByText(/^Confirm discount is included in subtotal \(\$2\.00\)$/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/keep both evidenced values/i)).toBeInTheDocument();
+  });
+
   it("identifies_the_target_item_by_ordinal_description_and_amount", () => {
     const lineCandidate: ReviewCandidate = {
       ...syntheticCandidate,

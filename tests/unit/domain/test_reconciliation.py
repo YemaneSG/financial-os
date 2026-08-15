@@ -67,6 +67,94 @@ class TestReconciliationEngine:
         kinds = [c.kind for c in result.review_candidates]
         assert "use_gross_line_sum_as_subtotal" in kinds
 
+    def test_discount_inclusive_subtotal_is_system_valid_without_correction(self):
+        """New validation preserves both evidenced values and recognizes their semantics."""
+        raw = make_synthetic_extraction_result(
+            subtotal_minor=21702,
+            tax_minor=198,
+            total_minor=21900,
+        )
+        raw["discount_minor"] = 600
+        raw["line_items"][0]["line_total_minor"] = 22302
+
+        assert compute_review_guidance(raw, _make_findings(raw)) is None
+
+    def test_historical_failure_offers_strong_discount_interpretation(self):
+        """A stored V1 failure gets a no-value-change V2 interpretation proposal."""
+        from financial_os.domain.states import ValidationOutcome
+
+        raw = make_synthetic_extraction_result(
+            subtotal_minor=21702,
+            tax_minor=198,
+            total_minor=21900,
+        )
+        raw["discount_minor"] = 600
+        raw["line_items"][0]["line_total_minor"] = 22302
+        historical_findings = [
+            type(
+                "FD",
+                (),
+                {
+                    "check_code": "TOTALS_ARITHMETIC_V1",
+                    "outcome": ValidationOutcome.FAIL,
+                },
+            )()
+        ]
+
+        result = compute_review_guidance(raw, historical_findings)
+
+        assert result is not None
+        assert result.signed_delta_minor == 600
+        assert result.review_candidates[0].kind == "confirm_discount_included_in_subtotal"
+        assert result.review_candidates[0].evidence_band == "strong"
+        assert "subtotal_already_includes_receipt_discount" in (
+            result.review_candidates[0].reason_codes
+        )
+        assert result.review_candidates[0].draft_patch == []
+
+    def test_discount_not_included_in_subtotal_requires_no_guidance(self):
+        """A gross subtotal with a separately applied discount is already consistent."""
+        raw = make_synthetic_extraction_result(
+            subtotal_minor=22302,
+            tax_minor=198,
+            total_minor=21900,
+        )
+        raw["discount_minor"] = 600
+        raw["line_items"][0]["line_total_minor"] = 22302
+
+        assert compute_review_guidance(raw, _make_findings(raw)) is None
+
+    def test_incomplete_line_coverage_cannot_make_discount_candidate_strong(self):
+        """An exact amount match alone is possible evidence, not a strong recommendation."""
+        raw = make_synthetic_extraction_result(
+            subtotal_minor=1000,
+            tax_minor=80,
+            total_minor=1080,
+        )
+        raw["discount_minor"] = 50
+        raw["line_items"] = [
+            {
+                "ordinal": 1,
+                "raw_description": "SYNTHETIC ITEM WITH TOTAL",
+                "line_total_minor": 500,
+            },
+            {
+                "ordinal": 2,
+                "raw_description": "SYNTHETIC ITEM WITHOUT TOTAL",
+                "line_total_minor": None,
+            },
+        ]
+
+        result = compute_review_guidance(raw, _make_findings(raw))
+
+        assert result is not None
+        clear_candidate = next(
+            candidate
+            for candidate in result.review_candidates
+            if candidate.kind == "clear_receipt_discount"
+        )
+        assert clear_candidate.evidence_band == "possible"
+
     def test_clear_receipt_discount_is_strong_when_only_restoring_candidate(self):
         """When clear_receipt_discount is the unique fully-restoring candidate, it is 'strong'.
 
