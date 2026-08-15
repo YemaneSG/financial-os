@@ -4,7 +4,7 @@
 **Owner:** Yemane  
 **Maintainer:** Codex operating lead  
 **Created:** August 13, 2026  
-**Last updated:** August 14, 2026
+**Last updated:** August 15, 2026
 
 ## 1. How to use this register
 
@@ -19,6 +19,23 @@ Status values:
 - `Superseded` — replaced by a later recorded decision.
 
 ## 2. Accepted decisions
+
+### DT-DEC-003 — Mobile correction actions remain continuously reachable
+
+| Field | Decision |
+|---|---|
+| Status | `Accepted` |
+| Decision date | August 15, 2026 |
+| Decision owner | Yemane |
+| Outcome | Keep the correction form's primary save action fixed to the bottom of the mobile viewport throughout review, with iPhone safe-area clearance and enough document padding to prevent content obstruction. |
+| Responsive boundary | Viewports below 768 px use the fixed action bar constrained to the 480 px application shell; wider viewports retain normal in-flow actions. |
+| Interaction hierarchy | Save expands to the available mobile width; Cancel remains secondary; existing validation, submission, and disabled states are unchanged. |
+| Scope boundary | Presentation-only refinement; no receipt data, API, authorization, revision, or infrastructure behavior changes. |
+| Acceptance evidence | Frontend lint, TypeScript, all 138 unit tests, and the production PWA build must pass; the implementation release must also pass the existing CI, deployment, and security-header gates. |
+| Rationale | A primary action placed only at the end of a long itemized receipt forces unnecessary scrolling and is not suitable for fast phone-based review. |
+
+This decision replaces the ineffective end-of-form sticky behavior on mobile. It
+does not introduce autosave or bypass any correction validation.
 
 ### DT-DEC-002 — Sprint 2A is human review and trusted correction
 
@@ -58,7 +75,7 @@ This decision approves the name. It does not authorize an unplanned replacement 
 
 | Field | Value |
 |---|---|
-| Status | `In progress — initial release deployed; owner-acceptance refinement locally verified and pending publication` |
+| Status | `Complete — initial release and owner-acceptance refinement deployed and verified` |
 | Priority | Current bounded product slice |
 | Owner | Codex operating lead |
 | Trigger | Owner approved Sprint 2B subject to the smart-guidance design recorded below; implementation begins only after the research proposal handback |
