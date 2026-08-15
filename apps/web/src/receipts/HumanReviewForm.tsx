@@ -1,9 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { apiClient, ApiClientError } from "@/api/client";
 import type {
   ReceiptDetail,
   CreateHumanRevisionRequest,
   LineItemInput,
+  ReviewCandidate,
+  DraftPatch,
 } from "@/api/types";
 import {
   decimalPlacesForCurrency,
@@ -12,11 +14,44 @@ import {
   minorToDollars,
   toLocalDatetimeString,
 } from "./moneyUtils";
+import { formatMinorUnits } from "./formatters";
+
+function applyPatchToFormState(
+  patch: DraftPatch[],
+  formState: { subtotal: string; discount: string; lineItems: FormLineItem[] },
+  dp: number,
+): typeof formState {
+  let { subtotal, discount, lineItems } = { ...formState, lineItems: [...formState.lineItems] };
+  for (const p of patch) {
+    if (p.op === "clear_receipt_discount") {
+      discount = "";
+    } else if (p.op === "set_receipt_subtotal" && p.value != null) {
+      subtotal = minorToDollars(p.value, dp);
+    } else if (p.op === "set_receipt_discount" && p.value != null) {
+      discount = minorToDollars(p.value, dp);
+    } else if (p.op === "clear_receipt_subtotal") {
+      subtotal = "";
+    } else if (p.op === "clear_line_discount" && p.ordinal != null) {
+      lineItems = lineItems.map((li, idx) =>
+        idx + 1 === p.ordinal ? { ...li, discount: "" } : li,
+      );
+    } else if (p.op === "set_line_total" && p.ordinal != null && p.value != null) {
+      const value = p.value;
+      lineItems = lineItems.map((li, idx) =>
+        idx + 1 === p.ordinal ? { ...li, line_total: minorToDollars(value, dp) } : li,
+      );
+    } else if (p.op === "remove_line_item" && p.ordinal != null) {
+      lineItems = lineItems.filter((_, idx) => idx + 1 !== p.ordinal);
+    }
+  }
+  return { subtotal, discount, lineItems };
+}
 
 interface HumanReviewFormProps {
   receiptId: string;
   currentRevisionId: string;
   initialData: ReceiptDetail;
+  initialCandidatePatch?: ReviewCandidate | null;
   onSuccess: () => Promise<void>;
   onCancel: () => void;
 }
@@ -36,6 +71,7 @@ export function HumanReviewForm({
   receiptId,
   currentRevisionId,
   initialData,
+  initialCandidatePatch,
   onSuccess,
   onCancel,
 }: HumanReviewFormProps) {
@@ -57,33 +93,79 @@ export function HumanReviewForm({
     }
   });
 
-  const [subtotal, setSubtotal] = useState(() => minorToDollars(rev?.subtotal_minor, dp));
+  const [subtotal, setSubtotal] = useState(() => {
+    const base = minorToDollars(rev?.subtotal_minor, dp);
+    if (!initialCandidatePatch) return base;
+    return applyPatchToFormState(
+      initialCandidatePatch.draft_patch,
+      { subtotal: base, discount: "", lineItems: [] },
+      dp,
+    ).subtotal;
+  });
   const [tax, setTax] = useState(() => minorToDollars(rev?.tax_minor, dp));
   const [tip, setTip] = useState(() => minorToDollars(rev?.tip_minor, dp));
-  const [discount, setDiscount] = useState(() => minorToDollars(rev?.discount_minor, dp));
+  const [discount, setDiscount] = useState(() => {
+    const base = minorToDollars(rev?.discount_minor, dp);
+    if (!initialCandidatePatch) return base;
+    return applyPatchToFormState(
+      initialCandidatePatch.draft_patch,
+      { subtotal: "", discount: base, lineItems: [] },
+      dp,
+    ).discount;
+  });
   const [total, setTotal] = useState(() => minorToDollars(rev?.total_minor, dp));
 
   const [lineItems, setLineItems] = useState<FormLineItem[]>(() => {
     const items = initialData.line_items;
-    if (!items || items.length === 0) return [];
-    return items
-      .slice()
-      .sort((a, b) => a.ordinal - b.ordinal)
-      .map((item) => ({
-        description: item.normalized_description ?? item.raw_description,
-        normalized_description: item.normalized_description ?? "",
-        quantity: item.quantity ?? "",
-        unit: item.unit ?? "",
-        unit_price_decimal: item.unit_price_decimal ?? "",
-        line_total: minorToDollars(item.line_total_minor, dp),
-        discount: minorToDollars(item.discount_minor, dp),
-        category_suggestion: item.category_suggestion ?? "",
-      }));
+    const baseItems: FormLineItem[] =
+      !items || items.length === 0
+        ? []
+        : items
+            .slice()
+            .sort((a, b) => a.ordinal - b.ordinal)
+            .map((item) => ({
+              description: item.normalized_description ?? item.raw_description,
+              normalized_description: item.normalized_description ?? "",
+              quantity: item.quantity ?? "",
+              unit: item.unit ?? "",
+              unit_price_decimal: item.unit_price_decimal ?? "",
+              line_total: minorToDollars(item.line_total_minor, dp),
+              discount: minorToDollars(item.discount_minor, dp),
+              category_suggestion: item.category_suggestion ?? "",
+            }));
+    if (!initialCandidatePatch) return baseItems;
+    return applyPatchToFormState(
+      initialCandidatePatch.draft_patch,
+      { subtotal: "", discount: "", lineItems: baseItems },
+      dp,
+    ).lineItems;
   });
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState(false);
+
+  useEffect(() => {
+    if (!initialCandidatePatch) return;
+    const patch = initialCandidatePatch.draft_patch[0];
+    if (!patch) return;
+
+    let targetId = "hrf-subtotal";
+    if (patch.op === "clear_receipt_discount" || patch.op === "set_receipt_discount") {
+      targetId = "hrf-discount";
+    } else if (patch.op === "clear_line_discount" && patch.ordinal != null) {
+      targetId = `hrf-li-discount-${patch.ordinal - 1}`;
+    } else if (patch.op === "set_line_total" && patch.ordinal != null) {
+      targetId = `hrf-li-total-${patch.ordinal - 1}`;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      target?.focus();
+      target?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialCandidatePatch]);
 
   const addLineItem = useCallback(() => {
     setLineItems((prev) => [
@@ -271,6 +353,60 @@ export function HumanReviewForm({
           {error}
         </div>
       )}
+
+      {/* Live arithmetic preview */}
+      {(() => {
+        let sub: number | null = null;
+        let t: number | null = null;
+        let ti: number | null = null;
+        let di: number | null = null;
+        try {
+          sub = parseDollarsToMinorOptional(subtotal, dp);
+        } catch {
+          /* ignore parse errors in preview */
+        }
+        try {
+          t = parseDollarsToMinorOptional(tax, dp);
+        } catch {
+          /* ignore */
+        }
+        try {
+          ti = parseDollarsToMinorOptional(tip, dp);
+        } catch {
+          /* ignore */
+        }
+        try {
+          di = parseDollarsToMinorOptional(discount, dp);
+        } catch {
+          /* ignore */
+        }
+        if (sub != null || t != null) {
+          const computed = (sub ?? 0) + (t ?? 0) + (ti ?? 0) - (di ?? 0);
+          const totalMinor = (() => {
+            try {
+              return parseDollarsToMinor(total, dp);
+            } catch {
+              return null;
+            }
+          })();
+          const matches = totalMinor != null && computed === totalMinor;
+          return (
+            <div
+              className={`form-preview ${matches ? "form-preview--ok" : "form-preview--warn"}`}
+              aria-live="polite"
+            >
+              Calculated: {formatMinorUnits(computed, currency)}
+              {totalMinor != null && !matches && (
+                <span className="form-preview__delta">
+                  {" "}
+                  (Difference: {formatMinorUnits(totalMinor - computed, currency)})
+                </span>
+              )}
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       <div className="form-field">
         <label htmlFor="hrf-merchant">Merchant</label>

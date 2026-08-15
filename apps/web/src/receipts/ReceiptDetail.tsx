@@ -1,11 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiClient, ApiClientError } from "@/api/client";
-import type { ReceiptDetail as ReceiptDetailType, AssetSummary } from "@/api/types";
+import type {
+  ReceiptDetail as ReceiptDetailType,
+  AssetSummary,
+  ReviewCandidate,
+} from "@/api/types";
 import { ProcessingStatusBadge, VerificationStatusBadge } from "@/components/StatusBadge";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatMinorUnits } from "./formatters";
 import { HumanReviewForm } from "./HumanReviewForm";
+import { ValidationGuidance } from "./ValidationGuidance";
+import { buildConfirmedAsShownRequest } from "./confirmedAsShown";
 
 export function ReceiptDetailPage() {
   const { receiptId } = useParams<{ receiptId: string }>();
@@ -16,6 +22,12 @@ export function ReceiptDetailPage() {
   const [retryError, setRetryError] = useState<string | null>(null);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [showConfirmAsShown, setShowConfirmAsShown] = useState(false);
+  const [confirmingAsShown, setConfirmingAsShown] = useState(false);
+  const [confirmAsShownError, setConfirmAsShownError] = useState<string | null>(null);
+  const [selectedCandidatePatch, setSelectedCandidatePatch] = useState<ReviewCandidate | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     if (!receiptId) return;
@@ -72,6 +84,34 @@ export function ReceiptDetailPage() {
     }
   }, [receiptId, load]);
 
+  const handleConfirmAsShown = useCallback(async () => {
+    if (!receipt?.current_revision?.revision_id) return;
+
+    setConfirmingAsShown(true);
+    setConfirmAsShownError(null);
+
+    const req = buildConfirmedAsShownRequest(receipt);
+    if (!req) {
+      setConfirmAsShownError("This receipt is missing required extracted values.");
+      setConfirmingAsShown(false);
+      return;
+    }
+
+    try {
+      await apiClient.createHumanRevision(receipt.receipt_id, req);
+      setShowConfirmAsShown(false);
+      await load();
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        setConfirmAsShownError(err.body.message || "Confirmation failed.");
+      } else {
+        setConfirmAsShownError("Network error. Please try again.");
+      }
+    } finally {
+      setConfirmingAsShown(false);
+    }
+  }, [receipt, load]);
+
   const canRetry = receipt?.processing_status === "retryable_failed";
 
   if (loading) return <LoadingSpinner label="Loading receipt…" />;
@@ -105,11 +145,16 @@ export function ReceiptDetailPage() {
           receiptId={receipt.receipt_id}
           currentRevisionId={receipt.current_revision.revision_id}
           initialData={receipt}
+          initialCandidatePatch={selectedCandidatePatch}
           onSuccess={async () => {
             setShowReviewForm(false);
+            setSelectedCandidatePatch(null);
             await load();
           }}
-          onCancel={() => setShowReviewForm(false)}
+          onCancel={() => {
+            setShowReviewForm(false);
+            setSelectedCandidatePatch(null);
+          }}
         />
       ) : (
         <>
@@ -125,6 +170,21 @@ export function ReceiptDetailPage() {
           <section aria-label="Status">
             <ProcessingStatusBadge status={receipt.processing_status} />
             <VerificationStatusBadge status={receipt.verification_status} />
+            {receipt.verification_status === "human_verified" &&
+              receipt.validation_findings?.some(
+                (f) =>
+                  (f.check_code === "TOTALS_ARITHMETIC_V1" ||
+                    f.check_code === "LINE_ITEMS_TO_SUBTOTAL_V1") &&
+                  f.outcome === "fail",
+              ) && (
+                <p
+                  className="receipt-detail__exception-label"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Human confirmed — arithmetic exception
+                </p>
+              )}
 
             {receipt.safe_error_code && (
               <p className="receipt-detail__error-code" role="status">
@@ -164,6 +224,68 @@ export function ReceiptDetailPage() {
               </div>
             )}
           </section>
+
+          {/* Validation guidance — shown when guidance is present and not yet human-verified */}
+          {receipt.review_guidance && receipt.verification_status !== "human_verified" && (
+            <>
+              <ValidationGuidance
+                guidance={receipt.review_guidance}
+                currency={receipt.current_revision?.currency ?? "USD"}
+                revision={receipt.current_revision}
+                lineItems={receipt.line_items}
+                onApplyCandidate={(candidate) => {
+                  setSelectedCandidatePatch(candidate);
+                  setShowReviewForm(true);
+                }}
+                onConfirmAsShown={() => setShowConfirmAsShown(true)}
+                onEditManually={() => {
+                  setSelectedCandidatePatch(null);
+                  setShowReviewForm(true);
+                }}
+              />
+
+              {showConfirmAsShown && (
+                <div
+                  className="confirm-as-shown"
+                  role="dialog"
+                  aria-label="Confirm receipt as shown"
+                >
+                  <p>
+                    This will preserve the receipt with an arithmetic exception noted. The original
+                    evidence is unchanged.
+                  </p>
+                  {confirmAsShownError && (
+                    <div role="alert" className="alert alert--error">
+                      {confirmAsShownError}
+                    </div>
+                  )}
+                  <div className="confirm-as-shown__actions">
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => void handleConfirmAsShown()}
+                      disabled={confirmingAsShown}
+                      aria-label="Yes, confirm receipt as shown"
+                    >
+                      {confirmingAsShown ? "Confirming…" : "Yes, confirm as shown"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={() => {
+                        setShowConfirmAsShown(false);
+                        setConfirmAsShownError(null);
+                      }}
+                      disabled={confirmingAsShown}
+                      aria-label="Cancel confirmation"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
       {/* Images — loaded on demand via authenticated download capability */}
       {receipt.assets && receipt.assets.length > 0 && (

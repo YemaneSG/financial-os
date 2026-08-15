@@ -11,6 +11,7 @@ import hashlib
 import logging
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -50,7 +51,8 @@ from financial_os.schemas.common import ALLOWED_ASSET_MIME_TYPES, detect_mime_fr
 
 if TYPE_CHECKING:
     from financial_os.config import Settings
-    from financial_os.models.extraction import ReceiptRevision
+    from financial_os.models.extraction import LineItemRevision, ReceiptRevision
+    from financial_os.models.findings import ValidationFinding
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,7 @@ def _build_revision_summary(
         source_type=revision.source_type,
         merchant_normalized=revision.merchant_normalized,
         purchase_datetime=revision.purchase_datetime,
+        purchase_timezone=revision.purchase_timezone,
         currency=revision.currency,
         subtotal_minor=revision.subtotal_minor,
         tax_minor=revision.tax_minor,
@@ -444,6 +447,46 @@ async def list_receipts(
     return rschemas.ListReceiptsResponse(receipts=items, next_cursor=next_cursor)
 
 
+def _compute_receipt_review_guidance(
+    revision: ReceiptRevision | None,
+    findings: list[ValidationFinding] | None,
+    line_items: list[LineItemRevision] | None,
+) -> rschemas.ReviewGuidanceSchema | None:
+    """Build review_guidance from the current revision and its DB findings.
+
+    Isolates the import so it only loads when there is a revision with findings.
+    """
+    if revision is None or not findings:
+        return None
+    from financial_os.services.reconciliation import compute_review_guidance
+
+    raw_for_guidance = {
+        "currency": revision.currency,
+        "subtotal_minor": revision.subtotal_minor,
+        "tax_minor": revision.tax_minor,
+        "tip_minor": revision.tip_minor,
+        "discount_minor": revision.discount_minor,
+        "total_minor": revision.total_minor,
+        "line_items": [
+            {
+                "ordinal": li.ordinal,
+                "line_total_minor": li.line_total_minor,
+                "discount_minor": li.discount_minor,
+                "quantity": str(li.quantity) if li.quantity is not None else None,
+                "unit_price_decimal": (
+                    str(li.unit_price_decimal) if li.unit_price_decimal is not None else None
+                ),
+            }
+            for li in (line_items or [])
+        ],
+    }
+    # Wrap DB rows in duck-typed objects that expose check_code and outcome
+    finding_data_list = [
+        type("FD", (), {"check_code": f.check_code, "outcome": f.outcome})() for f in findings
+    ]
+    return compute_review_guidance(raw_for_guidance, finding_data_list)
+
+
 async def get_receipt(
     session: AsyncSession,
     owner: VerifiedOwner,
@@ -578,6 +621,8 @@ async def get_receipt(
                 check_code=f.check_code,
                 outcome=f.outcome,
                 rule_version=f.rule_version,
+                observed=rschemas.sanitize_finding_values(f.check_code, "observed", f.observed),
+                expected=rschemas.sanitize_finding_values(f.check_code, "expected", f.expected),
             )
             for f in (findings or [])
         ]
@@ -585,6 +630,7 @@ async def get_receipt(
         else None,
         safe_error_code=safe_error_code,
         provenance_summary=provenance,
+        review_guidance=_compute_receipt_review_guidance(revision, findings, line_items),
     )
 
 
@@ -678,6 +724,91 @@ async def retry_processing(
     )
 
 
+def _snapshot_equals_parent(
+    request: rschemas.CreateHumanRevisionRequest,
+    parent: ReceiptRevision,
+    parent_line_items: list[LineItemRevision],
+) -> bool:
+    """Semantic equality check for confirmed_as_shown disposition.
+
+    Every client-editable field must match the parent exactly.  None is distinct
+    from zero/empty so that a changed field can never be hidden by a zero value.
+    """
+
+    def _norm_int(v: int | None) -> int | None:
+        return v  # None is distinct from 0
+
+    def _norm_str(v: str | None) -> str | None:
+        return v.strip() if v else None
+
+    def _norm_dt(v: datetime | None) -> datetime | None:
+        """Normalize datetime to UTC-aware for instant comparison."""
+        if v is None:
+            return None
+        if v.tzinfo is not None:
+            return v.astimezone(UTC)
+        return v
+
+    def _norm_decimal(v: object) -> Decimal | None:
+        """Compare NUMERIC values semantically, independent of trailing zeros."""
+        return Decimal(str(v)) if v is not None else None
+
+    # Top-level scalar fields
+    if _norm_str(request.merchant_normalized) != _norm_str(
+        getattr(parent, "merchant_normalized", None)
+    ):
+        return False
+    if _norm_dt(request.purchase_datetime) != _norm_dt(getattr(parent, "purchase_datetime", None)):
+        return False
+    if _norm_str(request.purchase_timezone) != _norm_str(
+        getattr(parent, "purchase_timezone", None)
+    ):
+        return False
+    if request.currency != parent.currency:
+        return False
+    if _norm_int(request.subtotal_minor) != _norm_int(parent.subtotal_minor):
+        return False
+    if _norm_int(request.tax_minor) != _norm_int(parent.tax_minor):
+        return False
+    if _norm_int(request.tip_minor) != _norm_int(parent.tip_minor):
+        return False
+    if _norm_int(request.discount_minor) != _norm_int(parent.discount_minor):
+        return False
+    if _norm_int(request.total_minor) != _norm_int(parent.total_minor):
+        return False
+
+    # Line items: same count, same content after sorting by ordinal
+    if len(request.line_items) != len(parent_line_items):
+        return False
+
+    parent_sorted = sorted(parent_line_items, key=lambda li: li.ordinal)
+    for req_li, parent_li in zip(request.line_items, parent_sorted, strict=True):
+        if req_li.description.strip() != (parent_li.raw_description or "").strip():
+            return False
+        if _norm_str(req_li.normalized_description) != _norm_str(
+            getattr(parent_li, "normalized_description", None)
+        ):
+            return False
+        if _norm_decimal(req_li.quantity) != _norm_decimal(getattr(parent_li, "quantity", None)):
+            return False
+        if _norm_str(req_li.unit) != _norm_str(getattr(parent_li, "unit", None)):
+            return False
+        if _norm_decimal(req_li.unit_price_decimal) != _norm_decimal(
+            getattr(parent_li, "unit_price_decimal", None)
+        ):
+            return False
+        if _norm_int(req_li.line_total_minor) != _norm_int(parent_li.line_total_minor):
+            return False
+        if _norm_int(req_li.discount_minor) != _norm_int(parent_li.discount_minor):
+            return False
+        if _norm_str(req_li.category_suggestion) != _norm_str(
+            getattr(parent_li, "category_suggestion", None)
+        ):
+            return False
+
+    return True
+
+
 async def create_human_revision(
     session: AsyncSession,
     owner: VerifiedOwner,
@@ -692,8 +823,6 @@ async def create_human_revision(
     arithmetic validity, and atomic state transition. Does NOT commit — router commits.
     No receipt content (merchant names, amounts, etc.) may appear in log lines.
     """
-    from decimal import Decimal
-
     from financial_os.models.extraction import LineItemRevision, ReceiptRevision
     from financial_os.models.findings import ValidationFinding
     from financial_os.services.validation import run_deterministic_checks
@@ -768,15 +897,37 @@ async def create_human_revision(
         ],
     }
 
-    # Step 5: run deterministic arithmetic checks; reject on any FAIL.
+    # Load parent line items for the confirmed_as_shown equality check.
+    parent_li_result = await session.execute(
+        select(LineItemRevision)
+        .where(LineItemRevision.receipt_revision_id == receipt.current_revision_id)
+        .order_by(LineItemRevision.ordinal)
+    )
+    parent_line_items = list(parent_li_result.scalars().all())
+
+    # Step 5: run deterministic arithmetic checks; reject or allow based on disposition.
     # SCHEMA_VERSION_V1 is excluded: human corrections are not from the extraction
     # pipeline and must not be blocked by the extraction-schema version check.
     findings_data = run_deterministic_checks(corrected_raw)
-    if any(
+    disposition = request.review_disposition
+
+    has_material_fail = any(
         f.outcome == ValidationOutcome.FAIL and f.check_code != "SCHEMA_VERSION_V1"
         for f in findings_data
-    ):
-        raise ValidationError("Corrected totals or line-item arithmetic is inconsistent.")
+    )
+
+    if disposition == "corrected":
+        if has_material_fail:
+            raise ValidationError("Corrected totals or line-item arithmetic is inconsistent.")
+    elif disposition == "confirmed_as_shown":
+        if not _snapshot_equals_parent(request, parent_revision, parent_line_items):
+            raise ValidationError(
+                "confirmed_as_shown requires the submitted snapshot to match "
+                "the current revision exactly."
+            )
+        # Failed arithmetic findings are allowed and will be retained.
+    else:
+        raise ValidationError("Invalid review_disposition.")
 
     # Step 6: atomic write — all in the same transaction; do NOT commit here.
 
@@ -846,6 +997,12 @@ async def create_human_revision(
     session.add(receipt)
 
     # 6e. Append verification state event.
+    if disposition == "confirmed_as_shown":
+        reason_code = (
+            "human_confirmed_exception" if has_material_fail else "human_confirmed_as_shown"
+        )
+    else:
+        reason_code = "human_correction_submitted"
     session.add(
         StateEvent(
             receipt_id=receipt.id,
@@ -853,7 +1010,7 @@ async def create_human_revision(
             from_state=prev_verification,
             to_state=VerificationStatus.HUMAN_VERIFIED,
             actor_type=ActorType.USER,
-            reason_code="human_correction_submitted",
+            reason_code=reason_code,
             correlation_id=correlation_id,
         )
     )

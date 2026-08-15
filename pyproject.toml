@@ -126,6 +126,7 @@ addopts = [
 markers = [
     "unit: fast in-process tests with no external dependencies",
     "integration: tests requiring database, storage, or queue",
+    "security: authorization, bypass-prevention, and information-leakage tests",
     "contract: provider contract tests (fake provider)",
     "e2e: end-to-end browser or device tests",
     "slow: tests that take more than 5 seconds",

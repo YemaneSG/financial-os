@@ -8,9 +8,72 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_SAFE_FINDING_FIELD_TYPES: dict[str, dict[str, dict[str, tuple[type[object], ...]]]] = {
+    "TOTALS_ARITHMETIC_V1": {
+        "observed": {
+            "available_fields": (int,),
+            "total_minor": (int,),
+            "computed_minor": (int,),
+            "delta_minor": (int,),
+        },
+        "expected": {"tolerance_minor": (int,)},
+    },
+    "LINE_ITEM_ARITHMETIC_V1": {
+        "observed": {
+            "ordinal": (int,),
+            "line_total_minor": (int,),
+            "computed_minor": (int,),
+            "delta_minor": (int,),
+        },
+        "expected": {"tolerance_minor": (int,)},
+    },
+    "LINE_ITEMS_TO_SUBTOTAL_V1": {
+        "observed": {
+            "line_count": (int,),
+            "lines_with_total": (int,),
+            "subtotal_present": (bool,),
+            "subtotal_minor": (int,),
+            "gross_line_sum_minor": (int,),
+            "net_line_sum_minor": (int,),
+            "gross_delta_minor": (int,),
+            "net_delta_minor": (int,),
+        },
+        "expected": {"tolerance_minor": (int,)},
+    },
+    "SCHEMA_VERSION_V1": {
+        "observed": {"schema_version_present": (bool,)},
+        "expected": {"required_value": (str,)},
+    },
+}
+
+
+def sanitize_finding_values(
+    check_code: str,
+    section: Literal["observed", "expected"],
+    values: object,
+) -> dict[str, int | float | bool | str | None] | None:
+    """Project stored finding JSON onto the privacy-safe public allowlist."""
+    if not isinstance(values, dict):
+        return None
+    rules = _SAFE_FINDING_FIELD_TYPES.get(check_code, {}).get(section, {})
+    sanitized: dict[str, int | float | bool | str | None] = {}
+    for key, value in values.items():
+        allowed_types = rules.get(key)
+        if allowed_types is None:
+            continue
+        if value is None:
+            sanitized[key] = None
+        elif type(value) in allowed_types:
+            if isinstance(value, str) and (len(value) > 50 or value != "v1"):
+                continue
+            sanitized[key] = value
+    return sanitized or None
+
 
 # ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -57,9 +120,31 @@ class LineItemSummarySchema(BaseModel):
 class ValidationFindingSummarySchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    check_code: str
-    outcome: str
-    rule_version: str | None = None
+    check_code: str = Field(max_length=100)
+    outcome: str = Field(max_length=50)
+    rule_version: str | None = Field(default=None, max_length=20)
+    observed: dict[str, int | float | bool | str | None] | None = None
+    expected: dict[str, int | float | bool | str | None] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sanitize_finding_fields(cls, data: object) -> object:
+        """Drop unknown keys and non-scalar values before response validation."""
+        if not isinstance(data, dict):
+            return data
+        sanitized = dict(data)
+        check_code = sanitized.get("check_code")
+        if not isinstance(check_code, str):
+            sanitized["observed"] = None
+            sanitized["expected"] = None
+            return sanitized
+        sanitized["observed"] = sanitize_finding_values(
+            check_code, "observed", sanitized.get("observed")
+        )
+        sanitized["expected"] = sanitize_finding_values(
+            check_code, "expected", sanitized.get("expected")
+        )
+        return sanitized
 
 
 class RevisionSummarySchema(BaseModel):
@@ -69,6 +154,7 @@ class RevisionSummarySchema(BaseModel):
     source_type: str | None = None
     merchant_normalized: str | None = None
     purchase_datetime: datetime | None = None
+    purchase_timezone: str | None = None
     currency: str | None = None
     subtotal_minor: int | None = None
     tax_minor: int | None = None
@@ -145,6 +231,65 @@ class ListReceiptsResponse(BaseModel):
     next_cursor: str | None = None
 
 
+# ── Sprint 2B: Review guidance schemas ────────────────────────────────────────
+
+# PostgreSQL BIGINT upper bound (2^63 − 1). Must be defined before schemas that use it.
+_BIGINT_MAX = 9_223_372_036_854_775_807
+
+_DRAFT_PATCH_OPS = Literal[
+    "clear_receipt_discount",
+    "set_receipt_subtotal",
+    "set_receipt_discount",
+    "clear_receipt_subtotal",
+    "clear_line_discount",
+    "set_line_total",
+    "remove_line_item",
+]
+_SAFE_CODE = Annotated[str, Field(max_length=100, pattern=r"^[a-z0-9_]+$")]
+_SAFE_EQUATION = Annotated[str, Field(max_length=500)]
+
+
+class DraftPatchSchema(BaseModel):
+    """One allowlisted draft patch operation. Applied client-side only."""
+
+    op: _DRAFT_PATCH_OPS
+    ordinal: int | None = Field(default=None, ge=1, le=10_000)
+    value: int | None = Field(default=None, ge=0, le=_BIGINT_MAX)
+
+
+class ReviewCandidateSchema(BaseModel):
+    """One deterministic correction proposal from the reconciliation engine."""
+
+    kind: str = Field(max_length=100)
+    evidence_band: Literal["strong", "possible", "ambiguous"]
+    target_field: str | None = Field(default=None, max_length=100)
+    target_item_ordinal: int | None = Field(default=None, ge=1, le=10_000)
+    amount_minor: int | None = Field(default=None, ge=0, le=_BIGINT_MAX)
+    reason_codes: list[_SAFE_CODE] = Field(max_length=10)
+    equations_before: list[_SAFE_EQUATION] = Field(max_length=10)
+    equations_after: list[_SAFE_EQUATION] = Field(max_length=10)
+    draft_patch: list[DraftPatchSchema] = Field(max_length=5)
+
+
+class ReviewGuidanceSchema(BaseModel):
+    """Deterministic reconciliation guidance for receipts with arithmetic exceptions.
+
+    Contains at most three ranked candidates. No probability percentages;
+    evidence bands are strong, possible, or ambiguous only.
+    No receipt text or private identifiers — amounts and ordinals only.
+    """
+
+    signed_delta_minor: int
+    receipt_total_minor: int = Field(ge=0, le=_BIGINT_MAX)
+    computed_total_minor: int
+    component_equation: str = Field(max_length=500)
+    gross_line_sum_minor: int | None = None
+    net_line_sum_minor: int | None = None
+    subtotal_vs_gross_delta_minor: int | None = None
+    subtotal_vs_net_delta_minor: int | None = None
+    review_candidates: list[ReviewCandidateSchema] = Field(max_length=3)
+
+
 # ── Receipt detail ────────────────────────────────────────────────────────────
 
 
@@ -154,6 +299,7 @@ class ReceiptDetailSchema(ReceiptListItemSchema):
     validation_findings: list[ValidationFindingSummarySchema] | None = None
     safe_error_code: str | None = None
     provenance_summary: ProvenanceSummarySchema | None = None
+    review_guidance: ReviewGuidanceSchema | None = None
 
 
 # ── Finalize ─────────────────────────────────────────────────────────────────
@@ -186,9 +332,6 @@ class DownloadCapabilityResponse(BaseModel):
 
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 _PLAIN_DECIMAL_RE = re.compile(r"^\d+(?:\.\d+)?$")
-
-# PostgreSQL BIGINT upper bound (2^63 − 1). Amounts exceeding this cannot be stored.
-_BIGINT_MAX = 9_223_372_036_854_775_807
 
 # NUMERIC(18, 6) column constraints used for quantity and unit_price_decimal.
 _NUMERIC_MAX_PRECISION = 18
@@ -278,6 +421,7 @@ class CreateHumanRevisionRequest(BaseModel):
     discount_minor: int | None = Field(default=None, ge=0, le=_BIGINT_MAX)
     total_minor: int = Field(ge=0, le=_BIGINT_MAX)
     line_items: list[LineItemInputSchema] = Field(default_factory=list, max_length=200)
+    review_disposition: Literal["corrected", "confirmed_as_shown"] = "corrected"
 
     @field_validator("currency")
     @classmethod

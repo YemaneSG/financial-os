@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { HumanReviewForm } from "@/receipts/HumanReviewForm";
 import { parseDollarsToMinor } from "@/receipts/moneyUtils";
-import type { ReceiptDetail } from "@/api/types";
+import type { ReceiptDetail, ReviewCandidate } from "@/api/types";
 
 // Mock the API client. vi.mock is hoisted so this runs before any imports.
 vi.mock("@/api/client", () => {
@@ -77,6 +77,7 @@ function renderForm(
   initialDataOverrides: Partial<ReceiptDetail> = {},
   onSuccess = vi.fn((): Promise<void> => Promise.resolve()),
   onCancel = vi.fn(),
+  initialCandidatePatch: ReviewCandidate | null = null,
 ) {
   const initialData = makeInitialData(initialDataOverrides);
   return render(
@@ -84,6 +85,7 @@ function renderForm(
       receiptId={RECEIPT_ID}
       currentRevisionId={REVISION_ID}
       initialData={initialData}
+      initialCandidatePatch={initialCandidatePatch}
       onSuccess={onSuccess}
       onCancel={onCancel}
     />,
@@ -161,6 +163,28 @@ describe("HumanReviewForm", () => {
     renderForm();
     const merchantInput = screen.getByLabelText(/^merchant$/i) as HTMLInputElement;
     expect(merchantInput.value).toBe("Test Grocery Store");
+  });
+
+  it("focuses the affected control after applying a proposal", async () => {
+    renderForm(
+      {},
+      vi.fn((): Promise<void> => Promise.resolve()),
+      vi.fn(),
+      {
+        kind: "clear_receipt_discount",
+        evidence_band: "strong",
+        target_field: "discount_minor",
+        amount_minor: 50,
+        reason_codes: ["receipt_discount_matches_delta"],
+        equations_before: ["delta(50)"],
+        equations_after: ["delta(0)"],
+        draft_patch: [{ op: "clear_receipt_discount" }],
+      },
+    );
+
+    await waitFor(() => {
+      expect(document.getElementById("hrf-discount")).toHaveFocus();
+    });
   });
 
   it("calls onCancel when Cancel is clicked", () => {

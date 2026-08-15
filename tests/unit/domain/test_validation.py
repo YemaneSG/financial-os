@@ -3,6 +3,7 @@
 import pytest
 
 from financial_os.domain.states import ValidationOutcome
+from financial_os.schemas.receipt import ValidationFindingSummarySchema
 from financial_os.services.validation import (
     ValidationFindingData,
     determine_verification_status,
@@ -141,6 +142,74 @@ class TestDeterministicArithmetic:
 
 
 @pytest.mark.unit
+class TestLineItemsToSubtotalCheck:
+    def test_pass_when_subtotal_equals_gross_line_sum(self):
+        raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
+        # Default factory has one line with line_total_minor=subtotal_minor=1000
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        assert check.outcome == ValidationOutcome.PASS
+
+    def test_pass_when_subtotal_equals_net_line_sum(self):
+        raw = make_synthetic_extraction_result(subtotal_minor=900, tax_minor=80, total_minor=980)
+        # Line total 1000 with line discount 100 → net_sum=900 == subtotal
+        raw["line_items"][0]["line_total_minor"] = 1000
+        raw["line_items"][0]["discount_minor"] = 100
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        assert check.outcome == ValidationOutcome.PASS
+
+    def test_fail_when_subtotal_matches_neither_sum(self):
+        raw = make_synthetic_extraction_result(subtotal_minor=1200, tax_minor=80, total_minor=1280)
+        # line_total_minor defaults to subtotal_minor=1200 from factory... adjust so they differ
+        raw["line_items"][0]["line_total_minor"] = 999
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        assert check.outcome == ValidationOutcome.FAIL
+
+    def test_not_applicable_when_no_subtotal(self):
+        raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
+        raw["subtotal_minor"] = None
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        assert check.outcome == ValidationOutcome.NOT_APPLICABLE
+
+    def test_not_applicable_when_no_lines_with_totals(self):
+        raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
+        raw["line_items"][0]["line_total_minor"] = None
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        assert check.outcome == ValidationOutcome.NOT_APPLICABLE
+
+    def test_not_applicable_when_partial_line_coverage(self):
+        """NOT_APPLICABLE when SOME items lack line_total_minor — partial sum must not FAIL."""
+        raw = make_synthetic_extraction_result(subtotal_minor=1000, tax_minor=80, total_minor=1080)
+        # Two lines: one has line_total_minor, one does not — coverage is incomplete
+        raw["line_items"] = [
+            {
+                "ordinal": 1,
+                "raw_description": "SYNTHETIC ITEM WITH TOTAL",
+                "quantity": "1",
+                "unit_price_decimal": "5.00",
+                "line_total_minor": 500,
+            },
+            {
+                "ordinal": 2,
+                "raw_description": "SYNTHETIC ITEM WITHOUT TOTAL",
+                "quantity": "1",
+                "unit_price_decimal": "5.00",
+                "line_total_minor": None,  # missing — coverage incomplete
+            },
+        ]
+        findings = run_deterministic_checks(raw)
+        check = next(f for f in findings if f.check_code == "LINE_ITEMS_TO_SUBTOTAL_V1")
+        # Must NOT be FAIL — partial sum of 500 vs subtotal 1000 would be a spurious FAIL
+        assert check.outcome == ValidationOutcome.NOT_APPLICABLE, (
+            "Partial line coverage must produce NOT_APPLICABLE, not a false FAIL"
+        )
+
+
+@pytest.mark.unit
 class TestVerificationStatusDetermination:
     def test_all_pass_gives_system_validated(self):
         findings = [
@@ -184,3 +253,32 @@ class TestVerificationStatusDetermination:
             ),
         ]
         assert determine_verification_status(findings) == "system_validated"
+
+
+@pytest.mark.unit
+class TestFindingResponseSanitization:
+    def test_unknown_keys_and_non_scalar_values_are_removed(self):
+        finding = ValidationFindingSummarySchema(
+            check_code="TOTALS_ARITHMETIC_V1",
+            outcome="fail",
+            observed={
+                "total_minor": 1000,
+                "merchant_name": "PRIVATE TEXT",
+                "computed_minor": {"nested": "PRIVATE TEXT"},
+            },
+            expected={"tolerance_minor": 1, "unexpected": "PRIVATE TEXT"},
+        )
+
+        assert finding.observed == {"total_minor": 1000}
+        assert finding.expected == {"tolerance_minor": 1}
+
+    def test_unknown_check_exposes_no_details(self):
+        finding = ValidationFindingSummarySchema(
+            check_code="FUTURE_CHECK_V1",
+            outcome="warn",
+            observed={"total_minor": 1000},
+            expected={"required_value": "v1"},
+        )
+
+        assert finding.observed is None
+        assert finding.expected is None
