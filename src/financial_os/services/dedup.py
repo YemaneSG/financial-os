@@ -26,7 +26,6 @@ from sqlalchemy.types import Date
 from financial_os.domain.dedup import (
     compute_evidence_fingerprint,
     compute_semantic_fingerprint,
-    select_canonical_receipt_id,
 )
 from financial_os.domain.states import (
     ActorType,
@@ -175,20 +174,14 @@ async def classify_receipt(
             )
             session.add(member)
 
+        await session.flush()
         return DeduplicationStatus(receipt.deduplication_status)
 
     # ── Step 6: Rule 4 — partial structured match → suspected ─────────────────
     if revision is not None:
         suspected = await _find_partial_match(session, receipt, owner_id, revision)
         if suspected is not None:
-            canonical_id = select_canonical_receipt_id(
-                receipt_a_id=receipt.id,
-                receipt_a_acknowledged_at=receipt.acknowledged_at,
-                receipt_b_id=suspected.id,
-                receipt_b_acknowledged_at=suspected.acknowledged_at,
-            )
-            true_canonical_id = suspected.canonical_receipt_id or suspected.id
-            receipt.canonical_receipt_id = None if canonical_id == receipt.id else true_canonical_id
+            receipt.canonical_receipt_id = None
             new_status = DeduplicationStatus.SUSPECTED_DUPLICATE
             _write_dedup_fields(receipt, new_status, "partial_semantic")
             _emit_event_if_changed(
@@ -200,6 +193,7 @@ async def classify_receipt(
                 correlation_id,
                 actor_type,
             )
+            await session.flush()
             return new_status
 
     # ── Step 7: Rule 5 — unique ───────────────────────────────────────────────
@@ -215,6 +209,7 @@ async def classify_receipt(
         correlation_id,
         actor_type,
     )
+    await session.flush()
     return new_status
 
 

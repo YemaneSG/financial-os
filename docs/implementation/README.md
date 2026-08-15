@@ -6,6 +6,8 @@ Implementation is organized around observable vertical slices, not technology la
 
 - `sprint-0-1-plan.md` — one-session foundation and receipt-capture delivery plan
 - `execution-packets/sprint-0-1-receipt-capture.md` — bounded handoff to the implementation lead
+- `execution-packets/sprint-2c-receipt-integrity-discovery.md` — duplicate detection and receipt discovery contract
+- `evidence/sprint-2c-receipt-integrity-discovery-2026-08-15.md` — current local verification and remaining release gates
 
 ## Gate sequence
 

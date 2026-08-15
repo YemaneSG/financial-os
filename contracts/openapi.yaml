@@ -122,6 +122,17 @@ components:
         Independent trust dimension. Processing and verification states advance
         independently. No automated process sets human_verified.
 
+    DeduplicationStatus:
+      type: string
+      enum:
+        - unchecked
+        - unique
+        - suspected_duplicate
+        - confirmed_duplicate
+      description: >
+        Independent duplicate-classification axis. Suspected duplicates always
+        require human review; confirmed duplicates retain their own evidence.
+
     FinancialContext:
       type: string
       enum:
@@ -545,6 +556,7 @@ components:
         - financial_context
         - expected_asset_count
         - created_at
+        - deduplication_status
       properties:
         receipt_id:
           $ref: "#/components/schemas/UUID"
@@ -564,10 +576,124 @@ components:
           format: date-time
         created_at:
           $ref: "#/components/schemas/Timestamp"
+        deduplication_status:
+          $ref: "#/components/schemas/DeduplicationStatus"
+        canonical_receipt_id:
+          oneOf:
+            - $ref: "#/components/schemas/UUID"
+            - type: "null"
+          description: >
+            Earliest acknowledged receipt in a confirmed duplicate cluster.
+            Null for canonical and non-confirmed receipts.
         current_revision:
           oneOf:
             - $ref: "#/components/schemas/RevisionSummary"
             - type: "null"
+
+    ReceiptSearchRequest:
+      type: object
+      properties:
+        query:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 200
+          description: Merchant or canonical line-item description. Sent in the body.
+        date_from:
+          type:
+            - string
+            - "null"
+          format: date-time
+        date_to:
+          type:
+            - string
+            - "null"
+          format: date-time
+        amount_min_minor:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+        amount_max_minor:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+        processing_status:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ProcessingStatus"
+        verification_status:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/VerificationStatus"
+        deduplication_status:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/DeduplicationStatus"
+        sort:
+          type: string
+          enum:
+            - effective_date_desc
+            - effective_date_asc
+            - amount_desc
+            - amount_asc
+          default: effective_date_desc
+        cursor:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+
+    ReceiptSearchItem:
+      allOf:
+        - $ref: "#/components/schemas/ReceiptListItem"
+        - type: object
+          properties:
+            captured_at:
+              type:
+                - string
+                - "null"
+              format: date-time
+            match_context:
+              oneOf:
+                - type: object
+                  required: [source]
+                  properties:
+                    source:
+                      type: string
+                      enum: [merchant, line_item]
+                    matched_description:
+                      type:
+                        - string
+                        - "null"
+                      maxLength: 500
+                - type: "null"
+
+    ReceiptSearchResponse:
+      type: object
+      required: [receipts, total_count]
+      properties:
+        receipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiptSearchItem"
+        total_count:
+          type: integer
+          minimum: 0
+        next_cursor:
+          type:
+            - string
+            - "null"
 
     ReceiptDetail:
       allOf:
@@ -999,6 +1125,36 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /api/v1/receipts/search:
+    post:
+      operationId: searchReceipts
+      summary: Search and filter receipts for the authenticated owner
+      description: >
+        Searches normalized merchant and canonical line-item descriptions with
+        composable status, date, and amount filters. The search term is carried
+        in the JSON body so it does not enter URL request logs. Pagination uses
+        a filter-bound opaque keyset cursor.
+      tags: [receipts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptSearchRequest"
+      responses:
+        "200":
+          description: Owner-scoped receipt search results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptSearchResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 
   /api/v1/receipts/{receipt_id}:
     get:

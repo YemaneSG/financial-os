@@ -69,6 +69,11 @@ def upgrade() -> None:
         "deduplication_status IN "
         "('unchecked','unique','suspected_duplicate','confirmed_duplicate')",
     )
+    op.create_check_constraint(
+        "ck_receipt_canonical_not_self",
+        "receipts",
+        "canonical_receipt_id IS NULL OR canonical_receipt_id <> id",
+    )
 
     # ── Self-referential FK: canonical_receipt_id → receipts.id ──────────────
     op.create_foreign_key(
@@ -124,6 +129,7 @@ def downgrade() -> None:
     op.drop_index("ix_receipts_owner_evidence_fp", table_name="receipts")
 
     op.drop_constraint("fk_receipt_canonical", "receipts", type_="foreignkey")
+    op.drop_constraint("ck_receipt_canonical_not_self", "receipts", type_="check")
     op.drop_constraint("ck_receipt_deduplication_status", "receipts", type_="check")
 
     op.drop_column("receipts", "deduplication_checked_at")

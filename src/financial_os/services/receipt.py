@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +35,7 @@ from financial_os.domain.errors import (
 )
 from financial_os.domain.states import (
     ActorType,
+    DeduplicationStatus,
     FinancialContext,
     ProcessingStatus,
     StateEventDimension,
@@ -85,12 +87,24 @@ def _build_revision_summary(
     )
 
 
-def _encode_cursor(ts: datetime) -> str:
-    return base64.urlsafe_b64encode(ts.isoformat().encode()).decode()
+def _encode_cursor(ts: datetime, receipt_id: uuid.UUID) -> str:
+    payload = json.dumps(
+        {"v": 2, "created_at": ts.isoformat(), "id": str(receipt_id)},
+        separators=(",", ":"),
+    )
+    return base64.urlsafe_b64encode(payload.encode()).decode()
 
 
-def _decode_cursor(cursor: str) -> datetime:
-    return datetime.fromisoformat(base64.urlsafe_b64decode(cursor.encode()).decode())
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID | None]:
+    decoded = base64.urlsafe_b64decode(cursor.encode()).decode()
+    try:
+        payload = json.loads(decoded)
+        if payload.get("v") != 2:
+            raise ValueError
+        return datetime.fromisoformat(payload["created_at"]), uuid.UUID(payload["id"])
+    except (AttributeError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        # Backward compatibility for already-issued timestamp-only cursors.
+        return datetime.fromisoformat(decoded), None
 
 
 async def _resolve_owner_id(
@@ -410,37 +424,37 @@ async def list_receipts(
 
     owner_id = await _resolve_owner_id(session, owner, settings)
 
-    stmt = (
-        select(Receipt)
-        .where(Receipt.owner_id == owner_id)
-        .order_by(Receipt.created_at.desc())
-        .limit(limit + 1)
+    stmt = select(Receipt, ReceiptRevision).outerjoin(
+        ReceiptRevision, Receipt.current_revision_id == ReceiptRevision.id
     )
+    stmt = stmt.where(Receipt.owner_id == owner_id)
 
     if cursor:
         try:
-            cursor_ts = _decode_cursor(cursor)
-            stmt = stmt.where(Receipt.created_at < cursor_ts)
+            cursor_ts, cursor_id = _decode_cursor(cursor)
+            if cursor_id is None:
+                stmt = stmt.where(Receipt.created_at < cursor_ts)
+            else:
+                stmt = stmt.where(
+                    or_(
+                        Receipt.created_at < cursor_ts,
+                        and_(Receipt.created_at == cursor_ts, Receipt.id < cursor_id),
+                    )
+                )
         except Exception:
             logger.info("Invalid receipt-list cursor ignored")
 
+    stmt = stmt.order_by(Receipt.created_at.desc(), Receipt.id.desc()).limit(limit + 1)
     result = await session.execute(stmt)
-    rows = list(result.scalars().all())
+    rows = list(result.all())
 
     next_cursor = None
     if len(rows) > limit:
         rows = rows[:limit]
-        next_cursor = _encode_cursor(rows[-1].created_at)
+        next_cursor = _encode_cursor(rows[-1][0].created_at, rows[-1][0].id)
 
     items = []
-    for receipt in rows:
-        revision = None
-        if receipt.current_revision_id:
-            rev_result = await session.execute(
-                select(ReceiptRevision).where(ReceiptRevision.id == receipt.current_revision_id)
-            )
-            revision = rev_result.scalar_one_or_none()
-
+    for receipt, revision in rows:
         items.append(
             rschemas.ReceiptListItemSchema(
                 receipt_id=receipt.id,
@@ -450,6 +464,8 @@ async def list_receipts(
                 expected_asset_count=receipt.expected_asset_count,
                 acknowledged_at=receipt.acknowledged_at,
                 created_at=receipt.created_at,
+                deduplication_status=DeduplicationStatus(receipt.deduplication_status),
+                canonical_receipt_id=receipt.canonical_receipt_id,
                 current_revision=_build_revision_summary(revision),
             )
         )
@@ -597,6 +613,8 @@ async def get_receipt(
         expected_asset_count=receipt.expected_asset_count,
         acknowledged_at=receipt.acknowledged_at,
         created_at=receipt.created_at,
+        deduplication_status=DeduplicationStatus(receipt.deduplication_status),
+        canonical_receipt_id=receipt.canonical_receipt_id,
         current_revision=_build_revision_summary(revision),
         assets=[
             rschemas.AssetSummarySchema(

@@ -68,7 +68,7 @@ def db_url_module() -> str:
     return url
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def test_engine(db_url_module: str):
     engine = create_async_engine(db_url_module, echo=False)
     async with engine.begin() as conn:
@@ -79,7 +79,7 @@ async def test_engine(db_url_module: str):
     await engine.dispose()
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def session_factory(test_engine):
     factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
@@ -101,7 +101,7 @@ async def session_factory(test_engine):
     return factory
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def owner_id(session_factory) -> uuid.UUID:
     async with session_factory() as session:
         from sqlalchemy import select
@@ -115,7 +115,7 @@ async def owner_id(session_factory) -> uuid.UUID:
         return subject.id
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def other_owner_id(session_factory) -> uuid.UUID:
     async with session_factory() as session:
         from sqlalchemy import select
@@ -178,7 +178,7 @@ def _make_line_item(
     )
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def seeded_receipts(session_factory, owner_id, other_owner_id):
     """Seed a known set of synthetic receipts for search tests."""
     async with session_factory() as session:
@@ -190,33 +190,42 @@ async def seeded_receipts(session_factory, owner_id, other_owner_id):
             total_minor=500,
             purchase_datetime=datetime(2026, 6, 1, 10, 0, tzinfo=UTC),
         )
-        r_a.current_revision_id = rv_a.id
         session.add(r_a)
+        await session.flush()
         session.add(rv_a)
+        await session.flush()
+        r_a.current_revision_id = rv_a.id
 
         # Receipt B: merchant "Grocery Store", has line item "organic apples"
         r_b = _make_receipt(owner_id)
+        r_b.deduplication_status = "suspected_duplicate"
         rv_b = _make_revision(r_b, merchant_normalized="Grocery Store", total_minor=2000)
         li_b = _make_line_item(rv_b, description="organic apples")
-        r_b.current_revision_id = rv_b.id
         session.add(r_b)
+        await session.flush()
         session.add(rv_b)
+        await session.flush()
+        r_b.current_revision_id = rv_b.id
         session.add(li_b)
 
         # Receipt C: needs_review, merchant "Tech Shop"
         r_c = _make_receipt(owner_id)
         r_c.verification_status = "needs_review"
         rv_c = _make_revision(r_c, merchant_normalized="Tech Shop", total_minor=15000)
-        r_c.current_revision_id = rv_c.id
         session.add(r_c)
+        await session.flush()
         session.add(rv_c)
+        await session.flush()
+        r_c.current_revision_id = rv_c.id
 
         # Receipt D: different owner — must not appear in TEST_OWNER searches
         r_d = _make_receipt(other_owner_id)
         rv_d = _make_revision(r_d, merchant_normalized="Coffee House", total_minor=300)
-        r_d.current_revision_id = rv_d.id
         session.add(r_d)
+        await session.flush()
         session.add(rv_d)
+        await session.flush()
+        r_d.current_revision_id = rv_d.id
 
         # Receipt E: unreviewed, no revision
         r_e = _make_receipt(owner_id, processing_status="queued")
@@ -233,7 +242,7 @@ async def seeded_receipts(session_factory, owner_id, other_owner_id):
         }
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def app_module(session_factory):
     app = create_test_app(
         settings=TEST_SETTINGS,
@@ -376,6 +385,22 @@ class TestSearchFilters:
         assert str(seeded_receipts["r_c"].id) in ids
         assert str(seeded_receipts["r_a"].id) not in ids
 
+    async def test_deduplication_status_filter(self, client: AsyncClient, seeded_receipts):
+        r = await client.post(
+            "/api/v1/receipts/search",
+            json={"deduplication_status": ["suspected_duplicate"]},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        ids = {item["receipt_id"] for item in data["receipts"]}
+        assert str(seeded_receipts["r_b"].id) in ids
+        assert data["receipts"][0]["deduplication_status"] == "suspected_duplicate"
+
+    async def test_like_wildcards_are_literal(self, client: AsyncClient):
+        r = await client.post("/api/v1/receipts/search", json={"query": "%_"})
+        assert r.status_code == 200
+        assert r.json()["total_count"] == 0
+
 
 class TestSearchPagination:
     async def test_no_duplicates_across_pages(self, client: AsyncClient, seeded_receipts):
@@ -430,6 +455,49 @@ class TestSearchPagination:
             and item["current_revision"].get("total_minor") is not None
         ]
         assert amounts == sorted(amounts), "amount_asc: results not sorted ascending"
+
+    async def test_invalid_cursor_rejected(self, client: AsyncClient):
+        r = await client.post(
+            "/api/v1/receipts/search",
+            json={"cursor": "not-a-valid-cursor"},
+        )
+        assert r.status_code == 422
+
+    async def test_cursor_cannot_be_reused_with_different_filters(
+        self, client: AsyncClient, seeded_receipts
+    ):
+        first = await client.post(
+            "/api/v1/receipts/search",
+            json={"limit": 1},
+        )
+        cursor = first.json()["next_cursor"]
+        assert cursor is not None
+
+        reused = await client.post(
+            "/api/v1/receipts/search",
+            json={"limit": 1, "cursor": cursor, "query": "coffee"},
+        )
+        assert reused.status_code == 422
+
+    async def test_amount_sort_pages_include_null_amounts_once(
+        self, client: AsyncClient, seeded_receipts
+    ):
+        all_ids: list[str] = []
+        cursor = None
+        while True:
+            payload = {"sort": "amount_asc", "limit": 1}
+            if cursor:
+                payload["cursor"] = cursor
+            response = await client.post("/api/v1/receipts/search", json=payload)
+            assert response.status_code == 200
+            data = response.json()
+            all_ids.extend(item["receipt_id"] for item in data["receipts"])
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
+
+        assert len(all_ids) == len(set(all_ids))
+        assert str(seeded_receipts["r_e"].id) in all_ids
 
 
 class TestSearchSecurity:

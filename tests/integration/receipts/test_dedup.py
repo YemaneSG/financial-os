@@ -24,6 +24,7 @@ from financial_os.models import Base
 from financial_os.models.events import StateEvent
 from financial_os.models.extraction import LineItemRevision, ReceiptRevision
 from financial_os.models.receipt import Receipt, ReceiptAsset
+from financial_os.operations.backfill_dedup import _run_backfill
 from financial_os.services.dedup import classify_receipt
 
 pytestmark = [
@@ -50,7 +51,7 @@ def db_url_module() -> str:
     return url
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def engine(db_url_module: str):
     eng = create_async_engine(db_url_module, echo=False)
     async with eng.begin() as conn:
@@ -61,12 +62,12 @@ async def engine(db_url_module: str):
     await eng.dispose()
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def session(factory):
     async with factory() as sess:
         yield sess
@@ -243,7 +244,10 @@ class TestExactEvidenceDuplicate:
         # earlier is canonical (acknowledged first), so its status should be UNIQUE.
         assert s_earlier == DeduplicationStatus.UNIQUE
         await session.refresh(earlier)
+        await session.refresh(later)
         assert earlier.canonical_receipt_id is None
+        assert later.deduplication_status == DeduplicationStatus.CONFIRMED_DUPLICATE
+        assert later.canonical_receipt_id == earlier.id
 
 
 class TestSemanticDuplicate:
@@ -408,3 +412,56 @@ class TestEvidencePreservation:
         await session.refresh(asset)
         assert asset.sha256 == sha
         assert asset.upload_status == "verified"
+
+
+class TestBackfillDryRun:
+    """Dry-run reports an accurate cluster without persisting any projection."""
+
+    async def test_dry_run_rolls_back_all_changes(self, factory) -> None:
+        owner = uuid.uuid4()
+        data = b"\xff\xd8\xff" + b"\x91" * 100
+
+        async with factory() as setup_session:
+            earlier = await _insert_receipt(
+                setup_session,
+                owner_id=owner,
+                acknowledged_at=datetime(2026, 8, 1, 8, 0, tzinfo=UTC),
+            )
+            later = await _insert_receipt(
+                setup_session,
+                owner_id=owner,
+                acknowledged_at=datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+            )
+            await _insert_asset(setup_session, earlier, data=data)
+            await _insert_asset(setup_session, later, data=data)
+            receipt_ids = (earlier.id, later.id)
+            await setup_session.commit()
+
+        counts = await _run_backfill(
+            factory,
+            dry_run=True,
+            batch_size=1,
+            limit=None,
+        )
+        assert counts["evaluated"] == 2
+        assert counts["unique"] == 1
+        assert counts["confirmed_duplicate"] == 1
+
+        async with factory() as verify_session:
+            receipts = (
+                (await verify_session.execute(select(Receipt).where(Receipt.id.in_(receipt_ids))))
+                .scalars()
+                .all()
+            )
+            assert all(r.deduplication_status == DeduplicationStatus.UNCHECKED for r in receipts)
+            assert all(r.evidence_fingerprint is None for r in receipts)
+            events = (
+                (
+                    await verify_session.execute(
+                        select(StateEvent).where(StateEvent.receipt_id.in_(receipt_ids))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert events == []

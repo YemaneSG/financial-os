@@ -54,6 +54,10 @@ class Receipt(Base):
             "'unchecked','unique','suspected_duplicate','confirmed_duplicate')",
             name="ck_receipt_deduplication_status",
         ),
+        CheckConstraint(
+            "canonical_receipt_id IS NULL OR canonical_receipt_id <> id",
+            name="ck_receipt_canonical_not_self",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

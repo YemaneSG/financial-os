@@ -40,7 +40,7 @@ def db_url_module() -> str:
     return url
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def engine(db_url_module: str):
     eng = create_async_engine(db_url_module, echo=False)
     async with eng.begin() as conn:
@@ -51,12 +51,12 @@ async def engine(db_url_module: str):
     await eng.dispose()
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def session(factory):
     async with factory() as sess:
         yield sess

@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from financial_os.auth.firebase import VerifiedOwner
 from financial_os.domain.errors import ForbiddenError, ValidationError
+from financial_os.domain.states import DeduplicationStatus
 from financial_os.models.receipt import Receipt
 from financial_os.schemas.receipt import RevisionSummarySchema
 from financial_os.schemas.search import (
@@ -379,6 +380,8 @@ async def search_receipts(
                 acknowledged_at=receipt.acknowledged_at,
                 created_at=receipt.created_at,
                 captured_at=receipt.captured_at,
+                deduplication_status=DeduplicationStatus(receipt.deduplication_status),
+                canonical_receipt_id=receipt.canonical_receipt_id,
                 current_revision=revision_summary,
                 match_context=match_context,
             )
