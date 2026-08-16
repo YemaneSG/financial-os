@@ -108,6 +108,7 @@ describe('PlaidReturnCoordinator', () => {
 
     await coordinator.start(policy);
 
+    expect(coordinator.listenerState()).toBe('ready');
     expect(coordinator.returnSignal()).toEqual({
       kind: 'completion',
       source: 'cold-start',
@@ -126,6 +127,7 @@ describe('PlaidReturnCoordinator', () => {
     await Promise.resolve();
 
     expect(coordinator.returnSignal()).toBeNull();
+    expect(coordinator.disposition()).toBe('rejected');
     expect(harness.closeBrowser).not.toHaveBeenCalled();
   });
 

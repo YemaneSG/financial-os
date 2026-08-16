@@ -7,6 +7,8 @@ readonly MAIN_ACTIVITY="${APP_ID}/.MainActivity"
 readonly COMPLETION_URI="${APP_ID}://plaid/complete"
 readonly EXPECTED_TITLE="PM-0B native return proof"
 readonly EXPECTED_RETURN_STATUS="Return received. Checking the bound server session"
+readonly EXPECTED_LISTENER_STATUS="Native return listener ready."
+readonly REJECTED_RETURN_STATUS="Return rejected by local policy."
 
 apk_path="${1:-}"
 evidence_dir="${RUNNER_TEMP:-/tmp}/financial-os-pm0b-android"
@@ -92,6 +94,7 @@ clear_and_launch() {
   adb shell pm clear "${APP_ID}" >/dev/null
   adb shell am start -W -n "${MAIN_ACTIVITY}" >/dev/null
   wait_for_text "${EXPECTED_TITLE}" "baseline launch"
+  wait_for_text "${EXPECTED_LISTENER_STATUS}" "native listener registration"
   assert_text_absent "${EXPECTED_RETURN_STATUS}" "baseline launch"
 }
 
@@ -123,7 +126,16 @@ assert_text_absent "${EXPECTED_RETURN_STATUS}" "interruption resume"
 arm_direct_app_url_event
 send_completion_return
 assert_direct_app_url_event_seen
-wait_for_text "${EXPECTED_RETURN_STATUS}" "warm callback resume"
+forward_webview_debug
+if ! node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+  present "${EXPECTED_RETURN_STATUS}" "${ui_state_local}"; then
+  if grep -Fq "${REJECTED_RETURN_STATUS}" "${ui_state_local}"; then
+    echo "Warm callback reached Financial OS but was rejected by local policy." >&2
+  else
+    echo "Warm callback reached Capacitor but not the Financial OS listener." >&2
+  fi
+  exit 1
+fi
 
 # Replay: repeating the same public, token-free callback remains only a wake-up.
 send_completion_return

@@ -11,6 +11,8 @@ import { PlaidReturnCoordinator } from './core/native/plaid-return';
 export class App implements OnInit, OnDestroy {
   private readonly plaidReturnCoordinator = inject(PlaidReturnCoordinator);
   readonly plaidReturn = this.plaidReturnCoordinator.returnSignal;
+  readonly plaidReturnListener = this.plaidReturnCoordinator.listenerState;
+  readonly plaidReturnDisposition = this.plaidReturnCoordinator.disposition;
 
   ngOnInit(): void {
     if (Capacitor.isNativePlatform()) {

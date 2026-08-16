@@ -4,10 +4,19 @@
   <p>
     This isolated build uses synthetic identity and Plaid Sandbox data only.
   </p>
+  @if (plaidReturnListener() === 'ready') {
+    <p role="status" class="listener-status">Native return listener ready.</p>
+  }
+  @if (plaidReturnListener() === 'failed') {
+    <p role="status" class="listener-status">Native return listener unavailable.</p>
+  }
   @if (plaidReturn()) {
     <p role="status" class="return-status">
       Return received. Checking the bound server session before showing an outcome.
     </p>
+  }
+  @if (plaidReturnDisposition() === 'rejected') {
+    <p role="status" class="return-status">Return rejected by local policy.</p>
   }
   <p class="boundary">No real financial data · No receipt-service changes</p>
 </main>

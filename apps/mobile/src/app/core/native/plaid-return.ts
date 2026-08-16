@@ -5,6 +5,8 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 export type PlaidReturnKind = 'completion' | 'oauth-return';
 export type PlaidReturnSource = 'cold-start' | 'resume';
+export type PlaidReturnListenerState = 'idle' | 'ready' | 'failed';
+export type PlaidReturnDisposition = 'accepted' | 'rejected';
 
 export interface PlaidReturnSignal {
   readonly kind: PlaidReturnKind;
@@ -109,17 +111,27 @@ export class PlaidReturnCoordinator {
   private readonly bridge = inject(NATIVE_URL_BRIDGE);
   private listener: PluginListenerHandle | undefined;
   private readonly returnSignalState = signal<PlaidReturnSignal | null>(null);
+  private readonly listenerStateValue = signal<PlaidReturnListenerState>('idle');
+  private readonly dispositionValue = signal<PlaidReturnDisposition | null>(null);
 
   readonly returnSignal = this.returnSignalState.asReadonly();
+  readonly listenerState = this.listenerStateValue.asReadonly();
+  readonly disposition = this.dispositionValue.asReadonly();
 
   async start(policy: PlaidReturnPolicy = PLAID_RETURN_POLICY): Promise<void> {
     if (this.listener) {
       return;
     }
 
-    this.listener = await this.bridge.addUrlOpenListener((url) => {
-      void this.accept(url, 'resume', policy);
-    });
+    try {
+      this.listener = await this.bridge.addUrlOpenListener((url) => {
+        void this.accept(url, 'resume', policy);
+      });
+      this.listenerStateValue.set('ready');
+    } catch (error) {
+      this.listenerStateValue.set('failed');
+      throw error;
+    }
 
     const launchUrl = await this.bridge.getLaunchUrl();
     if (launchUrl) {
@@ -139,9 +151,11 @@ export class PlaidReturnCoordinator {
   ): Promise<void> {
     const kind = classifyPlaidReturnUrl(rawUrl, policy);
     if (!kind) {
+      this.dispositionValue.set('rejected');
       return;
     }
 
+    this.dispositionValue.set('accepted');
     this.returnSignalState.set({ kind, source });
 
     if (kind === 'completion') {
