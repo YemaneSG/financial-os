@@ -119,16 +119,42 @@ function post(body?: unknown, authorization = true): Request {
   });
 }
 
-test('uses browser Hosted Link mode until PM-0B owns a registered app link', () => {
+test('uses browser Hosted Link mode without a registered app link', () => {
   const payload = buildHostedLinkCreatePayload('synthetic-client');
 
   assert.equal(payload.hosted_link.is_mobile_app, false);
   assert.equal('redirect_uri' in payload, false);
   assert.equal(
     payload.hosted_link.completion_redirect_uri,
-    'financialos://plaid/complete',
+    'dev.financialos.premium.proof://plaid/complete',
   );
   assert.equal(payload.hosted_link.url_lifetime_seconds, 900);
+});
+
+test('uses mobile Hosted Link mode only with an exact HTTPS redirect', () => {
+  const redirectUri = 'https://links.synthetic.invalid/plaid/oauth-return';
+  const payload = buildHostedLinkCreatePayload(
+    'synthetic-client',
+    redirectUri,
+  );
+
+  assert.equal(payload.hosted_link.is_mobile_app, true);
+  assert.equal(payload.redirect_uri, redirectUri);
+});
+
+test('rejects unsafe native redirect configuration', () => {
+  assert.throws(() =>
+    buildHostedLinkCreatePayload(
+      'synthetic-client',
+      'http://links.synthetic.invalid/plaid/oauth-return',
+    )
+  );
+  assert.throws(() =>
+    buildHostedLinkCreatePayload(
+      'synthetic-client',
+      'https://links.synthetic.invalid/plaid/oauth-return?token=discarded',
+    )
+  );
 });
 
 test('rejects unsupported methods before authorization or server access', async () => {

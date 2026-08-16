@@ -18,6 +18,12 @@ main {
   text-transform: uppercase;
 }
 
+.return-status {
+  border-inline-start: 0.25rem solid #2d6a4f;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, #2d6a4f 10%, transparent);
+}
+
 h1,
 p {
   margin: 0;

@@ -3,16 +3,16 @@
 **Snapshot:** August 16, 2026
 **Owner:** Yemane
 **Operating lead:** Codex
-**Phase:** PM-0A complete; PM-0B device/toolchain gate pending
+**Phase:** PM-0A complete; PM-0B owner-authorized and in progress
 **Working branch:** `codex/premium-mobile-bootstrap`
 **Implementation base:** `origin/main` at `94ba2c4`
 **Operating receipt collector:** Unchanged and continuing independently
 
 ## Current outcome
 
-PM-0A is complete: Firebase owner authorization through Supabase and Plaid
-Sandbox Hosted Link server/browser completion are proven in the isolated
-Angular/Capacitor track. PM-0B remains the native build and device-return gate.
+PM-0A is complete. PM-0B now has a locally verified, token-free native callback
+boundary and credential-free current-platform CI lanes. The remaining gate is a
+real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
 
 ## Completed
 
@@ -64,11 +64,27 @@ Angular/Capacitor track. PM-0B remains the native build and device-return gate.
   two temporary Firebase users deleted, temporary Email/Password disabled,
   temporary Identity Toolkit API enablement reversed, and the temporary
   Firebase Authentication Admin role removed and verified absent
+- Owner explicitly authorized the bounded PM-0B publication, credential-free
+  current-platform builds, one owner-controlled HTTPS Universal/App Link, and
+  synthetic real-iPhone/Android-emulator return tests on August 16, 2026
+- Corrected the PM-0A server/native completion-scheme mismatch before device use
+- Added an exact callback classifier and coordinator that discards raw URL
+  material, treats the callback only as a wake-up, and never displays success
+  without the server-held session result
+- Added fixed custom-scheme declarations for iOS and Android and a shared iOS
+  build scheme; an HTTPS Universal/App Link remains intentionally absent until
+  the real host and platform associations exist
+- Added path-scoped GitHub native CI for Android and macOS 26/Xcode 26 plus a
+  generated-bundle credential scan
+- Local PM-0B preparation passes mobile lint, type checking, 17 tests, production
+  build, 25 Edge-function tests, plist/XML checks, private-data scan, bundle scan,
+  and whitespace validation
 
 ## In progress
 
-- PM-0A handback and GitHub evidence update
-- PM-0B modern iOS/Android toolchain and native return planning
+- GitHub Android and macOS 26 current-platform compile evidence
+- Owner-controlled HTTPS Universal/App Link selection and provider association
+- Real-iPhone and Android-emulator Hosted Link return verification
 
 ## Blockers and permissions
 
@@ -80,20 +96,22 @@ Angular/Capacitor track. PM-0B remains the native build and device-return gate.
 | Private Firebase configuration and minimum custom-claim authority | Third-party auth proof | Complete; synthetic users deleted, temporary provider/API disabled, temporary admin role removed |
 | Plaid developer Sandbox credentials | Hosted Link proof | Complete; stored as encrypted backend secrets only |
 | Official dependency registry access | Angular/Capacitor/Supabase scaffold | Authorized |
-| Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | Current host cannot satisfy; does not block PM-0A |
-| Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | Not installed; does not block PM-0A |
+| Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | GitHub macOS 26 compile lane prepared; signed real-iPhone delivery still required |
+| Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | GitHub compile lane prepared; emulator return still required |
+| Owner-controlled HTTPS Universal/App Link | Institution OAuth return and native mode | Exact host and platform association still required; no placeholder committed |
 | Claude Google reauthentication | Preferred implementation lead/independent Claude review | Blocked by provider reauthentication; alternative Codex agents remain available |
 
 No Plaid Trial/live access, real bank connection, production deployment, or
-receipt-system change is authorized in PM-0A.
+receipt-system change is authorized in PM-0.
 
 ## Next three actions
 
-1. Publish the PM-0A handback and close its bounded GitHub issue.
-2. Keep PM-0B open for a modern iOS/Android toolchain, an owner-controlled HTTPS
-   Universal/App Link, and real-device return evidence.
-3. Select the next owner-approved implementation slice after the PM-0 handback;
-   do not treat PM-0A browser evidence as native readiness.
+1. Publish the PM-0B preparation checkpoint and obtain green current-platform
+   Android and iOS compile evidence.
+2. Configure one owner-controlled HTTPS host with Apple and Android association,
+   register it with Plaid, and switch the Sandbox function to native mode.
+3. Run success, cancel, interruption, resume, and privacy checks on a real iPhone
+   and Android emulator; do not call PM-0 complete before both pass.
 
 ## Active canonical artifacts
 

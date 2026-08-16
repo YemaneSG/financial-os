@@ -24,7 +24,8 @@
     "premium:db:stop": "supabase stop",
     "premium:db:test": "supabase test db",
     "premium:db:lint": "supabase db lint",
-    "premium:functions:test": "node --test supabase/functions/_shared/*.test.ts"
+    "premium:functions:test": "node --test supabase/functions/_shared/*.test.ts",
+    "premium:bundle:scan": "bash scripts/check-premium-mobile-bundle.sh"
   },
   "devDependencies": {
     "supabase": "2.114.0",

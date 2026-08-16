@@ -1,0 +1,115 @@
+name: Premium Mobile Native
+
+on:
+  push:
+    paths:
+      - "apps/mobile/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/check-premium-mobile-bundle.sh"
+      - ".github/workflows/premium-mobile-native.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/check-premium-mobile-bundle.sh"
+      - ".github/workflows/premium-mobile-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premium-mobile-native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.19.0"
+
+jobs:
+  android-build:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and synchronize Android
+        run: |
+          pnpm mobile:build
+          pnpm --dir apps/mobile exec cap sync android
+
+      - name: Compile Android application
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify private-data and bundle boundaries
+        run: |
+          bash scripts/check-private-data.sh
+          pnpm premium:bundle:scan
+
+  ios-build:
+    name: iOS 26 simulator build
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and synchronize iOS
+        run: |
+          pnpm mobile:build
+          pnpm --dir apps/mobile exec cap sync ios
+
+      - name: Record current toolchain
+        run: xcodebuild -version
+
+      - name: Compile unsigned iOS simulator application
+        run: >-
+          xcodebuild
+          -project apps/mobile/ios/App/App.xcodeproj
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/premium-mobile-derived-data"
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Verify private-data and bundle boundaries
+        run: |
+          bash scripts/check-private-data.sh
+          pnpm premium:bundle:scan

@@ -1,20 +1,44 @@
-const COMPLETION_REDIRECT_URI = 'financialos://plaid/complete';
+const COMPLETION_REDIRECT_URI =
+  'dev.financialos.premium.proof://plaid/complete';
 const HOSTED_LINK_LIFETIME_SECONDS = 900;
 
-export function buildHostedLinkCreatePayload(clientUserId: string) {
-  return {
+function validNativeRedirectUri(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' &&
+      parsed.hostname.length > 0 &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.port &&
+      !parsed.search &&
+      !parsed.hash;
+  } catch {
+    return false;
+  }
+}
+
+export function buildHostedLinkCreatePayload(
+  clientUserId: string,
+  nativeRedirectUri?: string,
+) {
+  if (nativeRedirectUri !== undefined && !validNativeRedirectUri(nativeRedirectUri)) {
+    throw new Error('Invalid native redirect configuration');
+  }
+
+  const payload = {
     client_name: 'Financial OS',
     country_codes: ['US'],
     hosted_link: {
       completion_redirect_uri: COMPLETION_REDIRECT_URI,
-      // PM-0A is the server/browser proof. Plaid requires a registered HTTPS
-      // Universal/App Link in `redirect_uri` when this flag is true; that
-      // native return contract is intentionally deferred to PM-0B.
-      is_mobile_app: false,
+      is_mobile_app: nativeRedirectUri !== undefined,
       url_lifetime_seconds: HOSTED_LINK_LIFETIME_SECONDS,
     },
     language: 'en',
     products: ['transactions'],
     user: { client_user_id: clientUserId },
   };
+
+  return nativeRedirectUri
+    ? { ...payload, redirect_uri: nativeRedirectUri }
+    : payload;
 }

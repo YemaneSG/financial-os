@@ -1,8 +1,13 @@
 <main>
   <p class="eyebrow">Financial OS Premium Mobile</p>
-  <h1>PM-0A architecture proof</h1>
+  <h1>PM-0B native return proof</h1>
   <p>
     This isolated build uses synthetic identity and Plaid Sandbox data only.
   </p>
+  @if (plaidReturn()) {
+    <p role="status" class="return-status">
+      Return received. Checking the bound server session before showing an outcome.
+    </p>
+  }
   <p class="boundary">No real financial data · No receipt-service changes</p>
 </main>

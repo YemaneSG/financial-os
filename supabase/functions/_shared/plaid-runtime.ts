@@ -25,11 +25,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 class SandboxPlaidGateway implements PlaidGateway {
   private readonly clientId: string;
+  private readonly nativeRedirectUri: string | undefined;
   private readonly secret: string;
 
-  constructor(clientId: string, secret: string) {
+  constructor(
+    clientId: string,
+    secret: string,
+    nativeRedirectUri: string | undefined,
+  ) {
     this.clientId = clientId;
     this.secret = secret;
+    this.nativeRedirectUri = nativeRedirectUri;
   }
 
   private async post(path: string, body: unknown): Promise<unknown> {
@@ -53,7 +59,7 @@ class SandboxPlaidGateway implements PlaidGateway {
   async createHostedLink(clientUserId: string) {
     const payload = await this.post(
       '/link/token/create',
-      buildHostedLinkCreatePayload(clientUserId),
+      buildHostedLinkCreatePayload(clientUserId, this.nativeRedirectUri),
     );
 
     if (
@@ -243,6 +249,7 @@ export function createHostedLinkDependencies(): HostedLinkDependencies {
         plaid: new SandboxPlaidGateway(
           requiredEnvironment('PLAID_CLIENT_ID'),
           requiredEnvironment('PLAID_SECRET'),
+          Deno.env.get('PLAID_NATIVE_REDIRECT_URI') || undefined,
         ),
         store: storeFor(serviceClient),
       };

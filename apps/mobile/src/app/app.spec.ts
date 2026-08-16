@@ -18,7 +18,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('PM-0A architecture proof');
+    expect(compiled.querySelector('h1')?.textContent).toContain('PM-0B native return proof');
     expect(compiled.textContent).toContain('No real financial data');
     expect(compiled.textContent).toContain('No receipt-service changes');
   });

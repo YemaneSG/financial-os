@@ -1,6 +1,6 @@
 # Execution Packet — Premium Mobile Slice 0 Auth and Plaid Path Proof
 
-**Status:** Approved for PM-0A implementation; PM-0B deferred
+**Status:** PM-0A complete; PM-0B owner-authorized and in progress
 **Packet owner:** Yemane
 **Operating/integration lead:** Codex
 **Implementation lead:** Codex for PM-0A unless Claude Code is reauthenticated and explicitly assigned
@@ -90,6 +90,11 @@ Conversation history is supporting context only.
 
 ### PM-0B — modern native build/device gate
 
+- Add one fixed, token-free custom-scheme completion return. Treat it only as a
+  wake-up signal and refresh the exact subject-bound Link session from the
+  server before displaying an outcome.
+- Configure one owner-controlled HTTPS Universal/App Link for institution OAuth
+  return. Do not claim this evidence with a placeholder or unverified host.
 - Use a compatible Xcode 26 host/runner to build the iOS target and verify Hosted
   Link return on a real iPhone.
 - Install/authorize Android SDK tooling or use a hosted runner, build Android, and
@@ -200,5 +205,9 @@ smallest slice. Generated code alone is not completion.
 **Security addendum approved by:** Yemane, August 15, 2026
 **PM-0A implementation authorized by:** Yemane, August 15, 2026
 **External Sandbox permissions:** Authorized for the bounded synthetic/free/no-upgrade PM-0A actions in this packet
-**PM-0B toolchain/device authority:** Deferred; not authorized by this approval
+**PM-0B toolchain/device authority:** Authorized by Yemane, August 16, 2026
+**PM-0B authorized actions:** Stage/commit/push the prepared changes; run
+credential-free GitHub macOS 26 and Android builds; configure one
+owner-controlled HTTPS Universal/App Link; and perform synthetic Plaid return
+tests on a real iPhone and Android emulator
 **Conditions:** No live financial data; no receipt-product changes
