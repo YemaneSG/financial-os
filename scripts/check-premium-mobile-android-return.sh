@@ -50,26 +50,34 @@ forward_webview_debug() {
 
 wait_for_text() {
   local expected="$1"
+  local stage="$2"
 
   forward_webview_debug
-  node "${script_dir}/check-premium-mobile-webview-state.mjs" \
-    present "${expected}" "${ui_state_local}"
+  if ! node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+    present "${expected}" "${ui_state_local}"; then
+    echo "WebView assertion failed during ${stage}." >&2
+    exit 1
+  fi
 }
 
 assert_text_absent() {
   local unexpected="$1"
+  local stage="$2"
 
   forward_webview_debug
-  node "${script_dir}/check-premium-mobile-webview-state.mjs" \
-    absent "${unexpected}" "${ui_state_local}"
+  if ! node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+    absent "${unexpected}" "${ui_state_local}"; then
+    echo "WebView absence assertion failed during ${stage}." >&2
+    exit 1
+  fi
 }
 
 clear_and_launch() {
   adb shell am force-stop "${APP_ID}" >/dev/null
   adb shell pm clear "${APP_ID}" >/dev/null
   adb shell am start -W -n "${MAIN_ACTIVITY}" >/dev/null
-  wait_for_text "${EXPECTED_TITLE}"
-  assert_text_absent "${EXPECTED_RETURN_STATUS}"
+  wait_for_text "${EXPECTED_TITLE}" "baseline launch"
+  assert_text_absent "${EXPECTED_RETURN_STATUS}" "baseline launch"
 }
 
 send_completion_return() {
@@ -91,21 +99,21 @@ adb install -r "${apk_path}" >/dev/null
 clear_and_launch
 adb shell input keyevent KEYCODE_HOME >/dev/null
 adb shell am start -W -n "${MAIN_ACTIVITY}" >/dev/null
-wait_for_text "${EXPECTED_TITLE}"
-assert_text_absent "${EXPECTED_RETURN_STATUS}"
+wait_for_text "${EXPECTED_TITLE}" "interruption resume"
+assert_text_absent "${EXPECTED_RETURN_STATUS}" "interruption resume"
 
 # Resume: an exact callback wakes the already-running app into a neutral state.
 send_completion_return
-wait_for_text "${EXPECTED_RETURN_STATUS}"
+wait_for_text "${EXPECTED_RETURN_STATUS}" "warm callback resume"
 
 # Replay: repeating the same public, token-free callback remains only a wake-up.
 send_completion_return
-wait_for_text "${EXPECTED_RETURN_STATUS}"
+wait_for_text "${EXPECTED_RETURN_STATUS}" "callback replay"
 
 # Cold start: the listener is installed before the launch URL is reduced.
 adb shell am force-stop "${APP_ID}" >/dev/null
 send_completion_return
-wait_for_text "${EXPECTED_RETURN_STATUS}"
+wait_for_text "${EXPECTED_RETURN_STATUS}" "cold-start callback"
 
 # Forgery: query material is rejected and never rendered.
 clear_and_launch
@@ -113,8 +121,8 @@ adb shell am start -W \
   -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
   -d "${COMPLETION_URI}?unexpected=synthetic" >/dev/null
-wait_for_text "${EXPECTED_TITLE}"
-assert_text_absent "${EXPECTED_RETURN_STATUS}"
+wait_for_text "${EXPECTED_TITLE}" "forged callback"
+assert_text_absent "${EXPECTED_RETURN_STATUS}" "forged callback"
 
 # Keep raw diagnostic material private to the ephemeral runner and check only
 # for prohibited credential-shaped data. Nothing is uploaded as an artifact.

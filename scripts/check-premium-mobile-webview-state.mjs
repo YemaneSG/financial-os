@@ -83,6 +83,7 @@ async function readBodyText() {
 const timeoutMilliseconds = mode === 'present' ? 30_000 : 5_000;
 const deadline = Date.now() + timeoutMilliseconds;
 let observedDom = false;
+let lastFailure = 'The WebView debug endpoint was not reachable.';
 
 while (Date.now() < deadline) {
   try {
@@ -98,7 +99,11 @@ while (Date.now() < deadline) {
       console.error('Unexpected WebView state was observed.');
       process.exit(1);
     }
-  } catch {
+    lastFailure = 'The WebView DOM was reachable but the expected text was absent.';
+  } catch (error) {
+    if (error instanceof Error) {
+      lastFailure = error.message;
+    }
     // The WebView target can briefly disappear during a cold start or resume.
   }
 
@@ -109,5 +114,5 @@ if (mode === 'absent' && observedDom) {
   process.exit(0);
 }
 
-console.error('Expected privacy-safe WebView state was not observed.');
+console.error(`Expected privacy-safe WebView state was not observed. ${lastFailure}`);
 process.exit(1);
