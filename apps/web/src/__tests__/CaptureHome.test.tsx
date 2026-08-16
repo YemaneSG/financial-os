@@ -3,6 +3,15 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CaptureHome } from "@/receipts/CaptureHome";
 
+vi.mock("@/receipts/ReceiptDashboard", () => ({
+  ReceiptDashboard: () => (
+    <section aria-label="Receipt dashboard">
+      <h2>Receipt dashboard</h2>
+      <a href="/receipts">View all</a>
+    </section>
+  ),
+}));
+
 function makeFile(name = "receipt.jpg", type = "image/jpeg"): File {
   return new File(["content"], name, { type });
 }
@@ -32,9 +41,16 @@ describe("CaptureHome", () => {
     expect(screen.getByRole("button", { name: /choose existing photo/i })).toBeInTheDocument();
   });
 
-  it("renders recent receipts link", () => {
+  it("renders recent receipts link", async () => {
     renderCapture();
-    expect(screen.getByRole("link", { name: /recent receipts/i })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "View all" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Receipts" })).toBeInTheDocument();
+  });
+
+  it("renders a live receipt dashboard without weakening capture priority", () => {
+    renderCapture();
+    expect(screen.getByRole("heading", { name: /receipt dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /photograph a receipt/i })).toBeInTheDocument();
   });
 
   it("has accessible landmark for main", () => {
