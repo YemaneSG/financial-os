@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { Link } from "react-router-dom";
+import { ReceiptDashboard } from "./ReceiptDashboard";
 
 interface CaptureHomeProps {
   onImages: (files: File[]) => void;
@@ -16,40 +17,72 @@ export function CaptureHome({ onImages }: CaptureHomeProps) {
     e.target.value = "";
   }
 
+  const today = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
+
   return (
     <main className="capture-home" aria-label="Capture receipt">
-      <div className="capture-home__hero" aria-hidden="true">
-        <svg
-          className="receipt-icon"
-          viewBox="0 0 48 48"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <rect x="8" y="4" width="32" height="40" rx="3" fill="currentColor" opacity="0.15" />
-          <rect x="12" y="10" width="16" height="2" rx="1" fill="currentColor" />
-          <rect x="12" y="15" width="24" height="2" rx="1" fill="currentColor" />
-          <rect x="12" y="20" width="20" height="2" rx="1" fill="currentColor" />
-          <rect x="12" y="25" width="24" height="2" rx="1" fill="currentColor" />
-          <circle cx="34" cy="34" r="10" fill="var(--color-accent)" />
-          <path d="M34 30v4m0 4h.01" stroke="white" strokeWidth="2" strokeLinecap="round" />
-          <path d="M30 34a4 4 0 1 0 8 0 4 4 0 0 0-8 0z" stroke="white" strokeWidth="1.5" />
-        </svg>
+      <header className="premium-appbar">
+        <div>
+          <p>Dollar Trail</p>
+          <span>{today}</span>
+        </div>
+        <Link to="/receipts" className="premium-profile" aria-label="Open receipt history">
+          YO
+        </Link>
+      </header>
+
+      <div className="capture-home__content">
+        <section className="capture-home__intro" aria-labelledby="capture-home-heading">
+          <p className="premium-kicker">Every purchase leaves a clue</p>
+          <h1 id="capture-home-heading">Follow the story behind every dollar.</h1>
+          <p>Snap the receipt now. Build a financial memory you can search, review, and learn from.</p>
+        </section>
+
+        <section className="premium-capture-card" aria-label="New receipt">
+          <div className="premium-capture-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4v-10Zm8 7a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z" />
+            </svg>
+          </div>
+          <div className="premium-capture-card__copy">
+            <p className="premium-kicker">Private and durable</p>
+            <h2>Save a receipt</h2>
+            <p>One clear photo is fastest. Long receipts can use up to ten ordered photos.</p>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn--primary btn--large premium-capture-primary"
+            aria-label="Photograph a receipt"
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4v-10Zm8 7a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z" />
+            </svg>
+            Photograph receipt
+          </button>
+
+          <button
+            type="button"
+            className="premium-library-action"
+            aria-label="Choose existing photo from library"
+            onClick={() => libraryInputRef.current?.click()}
+          >
+            Choose from photos
+          </button>
+
+          <p className="premium-durability-note">
+            <span aria-hidden="true">✓</span>
+            “Saved” appears only after every photo is durably verified.
+          </p>
+        </section>
+
+        <ReceiptDashboard />
       </div>
-
-      <h1 className="capture-home__title">Financial OS</h1>
-      <p className="capture-home__tagline">Private receipt capture</p>
-
-      {/* Primary: camera capture via HTML Media Capture */}
-      <button
-        type="button"
-        className="btn btn--primary btn--large"
-        aria-label="Photograph a receipt"
-        onClick={() => cameraInputRef.current?.click()}
-      >
-        Photograph receipt
-      </button>
 
       {/* Hidden camera input — HTML Media Capture for reliable iPhone camera access */}
       <input
@@ -64,16 +97,6 @@ export function CaptureHome({ onImages }: CaptureHomeProps) {
         onChange={handleFiles}
       />
 
-      {/* Fallback: photo library */}
-      <button
-        type="button"
-        className="btn btn--ghost btn--small"
-        aria-label="Choose existing photo from library"
-        onClick={() => libraryInputRef.current?.click()}
-      >
-        Choose existing photo
-      </button>
-
       <input
         ref={libraryInputRef}
         type="file"
@@ -85,9 +108,14 @@ export function CaptureHome({ onImages }: CaptureHomeProps) {
         onChange={handleFiles}
       />
 
-      <nav className="capture-home__nav" aria-label="Secondary navigation">
-        <Link to="/receipts" className="link">
-          Recent receipts
+      <nav className="premium-bottom-nav" aria-label="Primary navigation">
+        <span className="premium-bottom-nav__active" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3l1.4-2h7.2l1.4 2h3v10H4v-10Zm8 7a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z" /></svg>
+          Capture
+        </span>
+        <Link to="/receipts">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6M9 12h6" /></svg>
+          Receipts
         </Link>
       </nav>
     </main>

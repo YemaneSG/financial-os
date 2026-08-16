@@ -3,7 +3,7 @@
 **Status:** Approved sequencing baseline  
 **Owner:** Yemane  
 **Created:** August 12, 2026  
-**Last updated:** August 15, 2026
+**Last updated:** August 16, 2026
 
 ## 1. Purpose
 
@@ -276,3 +276,8 @@ At sprint completion:
 - The bounded unique two-line hypothesis is deferred because it needs stronger evidence and multi-target UX before any double-deletion suggestion can be considered safe. This does not block the observed discount workflow or Sprint 2B release.
 - Sprint 2A stopped at owner acceptance of the immutable `human_verified` correction. Duplicate detection, image-quality warnings, and expanded offline behavior remain later Sprint 2 slices.
 - The evidence-only historical backfill policy, managed-cloud deployment, incremental Mac Mini transition, personal-only scope, and deferred DollarTrace rename remain approved and unchanged.
+- **Premium receipt capture dashboard:** the owner locally approved the existing
+  React PWA's premium capture surface and owner-scoped ingestion dashboard on
+  August 16, 2026, then authorized release through the existing guarded CI and
+  deployment workflow. The slice changes presentation and API consumption only;
+  it does not migrate or rewrite receipt data.
