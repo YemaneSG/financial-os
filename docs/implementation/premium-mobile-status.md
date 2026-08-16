@@ -79,11 +79,15 @@ real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
 - Local PM-0B preparation passes mobile lint, type checking, 17 tests, production
   build, 25 Edge-function tests, plist/XML checks, private-data scan, bundle scan,
   and whitespace validation
+- Corrected the Android runner to Java 21 and obtained green Android and macOS
+  26/Xcode 26 builds in native run 31970837438; full CI run 31970837452 also
+  passed its final gate
 
 ## In progress
 
-- GitHub macOS 26/Xcode 26 compile passed; Android reached Gradle and exposed a
-  JDK 17/source-21 mismatch, now corrected to JDK 21 for rerun
+- Credential-free Android emulator return matrix added for interruption/no-return,
+  resume, replay, cold start, rejected query material, process health, and leakage
+  checks; hosted result pending
 - Owner-controlled HTTPS Universal/App Link selection and provider association
 - Real-iPhone and Android-emulator Hosted Link return verification
 
@@ -97,8 +101,8 @@ real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
 | Private Firebase configuration and minimum custom-claim authority | Third-party auth proof | Complete; synthetic users deleted, temporary provider/API disabled, temporary admin role removed |
 | Plaid developer Sandbox credentials | Hosted Link proof | Complete; stored as encrypted backend secrets only |
 | Official dependency registry access | Angular/Capacitor/Supabase scaffold | Authorized |
-| Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | GitHub macOS 26 compile lane prepared; signed real-iPhone delivery still required |
-| Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | GitHub compile lane prepared; emulator return still required |
+| Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | GitHub macOS 26/Xcode 26 compile passed; signed real-iPhone delivery still required |
+| Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | GitHub Android compile passed; emulator return matrix queued |
 | Owner-controlled HTTPS Universal/App Link | Institution OAuth return and native mode | Exact host and platform association still required; no placeholder committed |
 | Claude Google reauthentication | Preferred implementation lead/independent Claude review | Blocked by provider reauthentication; alternative Codex agents remain available |
 
@@ -107,8 +111,7 @@ receipt-system change is authorized in PM-0.
 
 ## Next three actions
 
-1. Publish the PM-0B preparation checkpoint and obtain green current-platform
-   Android and iOS compile evidence.
+1. Obtain a green Android-emulator synthetic return matrix.
 2. Configure one owner-controlled HTTPS host with Apple and Android association,
    register it with Plaid, and switch the Sandbox function to native mode.
 3. Run success, cancel, interruption, resume, and privacy checks on a real iPhone

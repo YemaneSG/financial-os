@@ -1,8 +1,8 @@
 # Premium Mobile PM-0B — Native Return Preparation
 
 **Date:** August 16, 2026
-**Status:** Credential-free local preparation complete; current native builds and
-device returns pending
+**Status:** Current credential-free native builds pass; emulator and real-iPhone
+returns pending
 **Boundary:** Synthetic Plaid Sandbox only; no real financial data, token exchange,
 persistent Item, production deployment, or receipt-service change
 
@@ -48,9 +48,21 @@ compilation because the workflow selected JDK 17 while Capacitor Android require
 source release 21. The workflow was corrected to JDK 21; no product or security
 contract changed. The first macOS 26/Xcode 26 unsigned simulator build passed.
 
+The corrected [native run](https://github.com/YemaneSG/financial-os/actions/runs/31970837438)
+passes both the macOS 26/Xcode 26 simulator build and the Android debug build.
+The same revision's [full CI run](https://github.com/YemaneSG/financial-os/actions/runs/31970837452)
+passes its final gate, including the premium-mobile proof, dependency, secret,
+private-data, contract, unit, integration, and container checks.
+
+The next credential-free revision extends the Android lane with an ephemeral
+Android 15 emulator. Its bounded matrix checks interruption with no return, warm
+resume, replay, cold start, rejected query material, neutral UI state, process
+health, and credential-shaped data absence across UI, logcat, and app storage.
+The ephemeral diagnostic files are scanned in place and never uploaded.
+
 ## Remaining acceptance evidence
 
-1. Obtain green GitHub Android and macOS 26/Xcode 26 builds.
+1. Obtain a green Android-emulator synthetic callback matrix.
 2. Select one owner-controlled HTTPS host and publish the exact Apple association
    and Android Digital Asset Links documents for the signed app.
 3. Register the HTTPS redirect with Plaid and privately configure the Edge
