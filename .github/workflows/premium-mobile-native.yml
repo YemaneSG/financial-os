@@ -1,0 +1,210 @@
+name: Premium Mobile Native
+
+on:
+  push:
+    paths:
+      - "apps/mobile/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/check-premium-mobile-bundle.sh"
+      - "scripts/check-premium-mobile-android-return.sh"
+      - "scripts/check-premium-mobile-webview-state.mjs"
+      - ".github/workflows/premium-mobile-native.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/check-premium-mobile-bundle.sh"
+      - "scripts/check-premium-mobile-android-return.sh"
+      - "scripts/check-premium-mobile-webview-state.mjs"
+      - ".github/workflows/premium-mobile-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premium-mobile-native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.19.0"
+
+jobs:
+  android-build:
+    name: Android build and emulator return
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and synchronize Android
+        run: |
+          pnpm mobile:build
+          pnpm --dir apps/mobile exec cap sync android
+
+      - name: Compile Android application
+        working-directory: apps/mobile/android
+        run: |
+          for attempt in 1 2 3; do
+            if ./gradlew --version --no-daemon; then
+              break
+            fi
+            if [[ "${attempt}" == "3" ]]; then
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare credential-free Android emulator
+        run: |
+          sudo chmod 666 /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/pm0b-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >>"$GITHUB_ENV"
+          sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          avdmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager -print -quit)"
+          if [[ ! -x "${sdkmanager_path}" || ! -x "${avdmanager_path}" ]]; then
+            echo "Android SDK command-line tools were not found." >&2
+            exit 1
+          fi
+          "${sdkmanager_path}" --install \
+            "emulator" \
+            "system-images;android-35;google_apis;x86_64" >/dev/null
+          echo no | "${avdmanager_path}" create avd \
+            --force \
+            --name pm0b-proof \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device pixel_6 >/dev/null
+          if ! "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fxq pm0b-proof; then
+            echo "The PM-0B Android virtual device was not indexed." >&2
+            exit 1
+          fi
+          printf '%s\n' \
+            "$ANDROID_HOME/platform-tools" \
+            "$ANDROID_HOME/emulator" \
+            >>"$GITHUB_PATH"
+
+      - name: Start Android emulator
+        run: |
+          nohup emulator @pm0b-proof \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-metrics \
+            -no-snapshot \
+            -accel on \
+            -cores 2 \
+            -memory 2048 \
+            -gpu software \
+            >"$RUNNER_TEMP/pm0b-emulator.txt" 2>&1 &
+          emulator_pid=$!
+          device_ready=false
+          for attempt in {1..60}; do
+            if [[ "$(adb get-state 2>/dev/null || true)" == "device" ]]; then
+              device_ready=true
+              break
+            fi
+            if ! kill -0 "${emulator_pid}" 2>/dev/null; then
+              echo "Android emulator exited before registering a device." >&2
+              tail -n 100 "$RUNNER_TEMP/pm0b-emulator.txt" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          if [[ "${device_ready}" != "true" ]]; then
+            echo "Android emulator did not register a device in time." >&2
+            tail -n 100 "$RUNNER_TEMP/pm0b-emulator.txt" >&2
+            exit 1
+          fi
+          for attempt in {1..90}; do
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              exit 0
+            fi
+            if ! kill -0 "${emulator_pid}" 2>/dev/null; then
+              echo "Android emulator exited before boot completed." >&2
+              tail -n 100 "$RUNNER_TEMP/pm0b-emulator.txt" >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Android emulator did not finish booting." >&2
+          tail -n 100 "$RUNNER_TEMP/pm0b-emulator.txt" >&2
+          exit 1
+
+      - name: Verify synthetic Plaid return boundary on emulator
+        run: >-
+          bash scripts/check-premium-mobile-android-return.sh
+          apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Verify private-data and bundle boundaries
+        run: |
+          bash scripts/check-private-data.sh
+          pnpm premium:bundle:scan
+
+  ios-build:
+    name: iOS 26 simulator build
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and synchronize iOS
+        run: |
+          pnpm mobile:build
+          pnpm --dir apps/mobile exec cap sync ios
+
+      - name: Record current toolchain
+        run: xcodebuild -version
+
+      - name: Compile unsigned iOS simulator application
+        run: >-
+          xcodebuild
+          -project apps/mobile/ios/App/App.xcodeproj
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/premium-mobile-derived-data"
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Verify private-data and bundle boundaries
+        run: |
+          bash scripts/check-private-data.sh
+          pnpm premium:bundle:scan

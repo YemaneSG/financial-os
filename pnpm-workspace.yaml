@@ -1,13 +1,22 @@
 packages:
   - apps/web
+  - apps/mobile
 
 overrides:
   undici@6.19.7: 6.28.0
 
 allowBuilds:
+  '@firebase/util': true
+  '@parcel/watcher': true
   esbuild: true
+  lmdb: true
+  msgpackr-extract: true
   protobufjs: true
 
 onlyBuiltDependencies:
+  - '@firebase/util'
+  - '@parcel/watcher'
   - esbuild
+  - lmdb
+  - msgpackr-extract
   - protobufjs

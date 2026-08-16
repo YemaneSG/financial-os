@@ -1,7 +1,7 @@
 # AGENTS.md — Financial OS
 
-> Model-agnostic contributor guide for all AI agents, automated tools, and human contributors.  
-> Tool-specific adapters (`CLAUDE.md`, agent definitions, skills, hooks) implement this policy and may not override it.  
+> Model-agnostic contributor guide for all AI agents, automated tools, and human contributors.
+> Tool-specific adapters (`CLAUDE.md`, agent definitions, skills, hooks) implement this policy and may not override it.
 > Canonical policy lives in `docs/governance/ai-development-operating-model.md`.
 
 ---
@@ -12,28 +12,49 @@
 
 | Tier | Documents | Status |
 |---|---|---|
-| 1 — Security floor | `docs/security/control-baseline.md` MUST controls | Release blocking; may never be silently waived |
-| 2 — Product contract | `docs/product/PRD.md`, `docs/product/roadmap.md`, `docs/product/open-items-and-decisions.md` | Authoritative scope, outcomes, accepted decisions, and open items |
-| 3 — Architecture contract | `docs/architecture/system-architecture.md`, `docs/architecture/data-architecture.md`, `docs/architecture/technology-recommendation.md` | Authoritative design and data model |
+| 1 — Security floor | `docs/security/control-baseline.md` and, for the separate premium-mobile track, `docs/security/premium-mobile-control-addendum.md` MUST controls | Release blocking; may never be silently waived |
+| 2 — Product contract | `docs/product/PRD.md`, `docs/product/premium-mobile-app-PRD.md`, `docs/product/roadmap.md`, `docs/product/open-items-and-decisions.md` | Authoritative scope, outcomes, accepted decisions, and open items |
+| 3 — Architecture contract | `docs/architecture/system-architecture.md`, `docs/architecture/data-architecture.md`, `docs/architecture/technology-recommendation.md`, and for the separate premium-mobile track `docs/architecture/premium-mobile-system-architecture.md` | Authoritative design and data model |
 | 4 — Implementation contract | The current owner-approved packet in `docs/implementation/execution-packets/`, plus `docs/architecture/implementation-contracts.md` | Authoritative for the bounded implementation slice |
 | 5 — Governance | `docs/governance/ai-development-operating-model.md` | Authoritative for process and roles |
 | 6 — Supporting context | `MAC_MINI_FINANCIAL_OS_BLUEPRINT.md`, `personal_ai_finance_codex_handoff.md` | Informational only; superseded by Tiers 1–5 on any conflict |
 
 **Plaid, Actual Budget, rental day-one scope, SwiftUI, and multi-user features are explicitly rejected from Wave 1** — Section 6 of `docs/reviews/gate-a/synthesis-and-disposition.md`. No tier-6 document overrides this.
 
+**Separate-track clarification — DT-DEC-005:** the Wave 1 rejection still governs
+the operating receipt collector. It does not prohibit Plaid, Angular/Capacitor,
+Android, or Supabase inside the separately authorized premium-mobile application
+when the current owner-approved premium-mobile execution packet explicitly
+includes them. The new application may consume the receipt API but may not replace,
+migrate, dual-write, or silently change the receipt system or its frozen contracts.
+
 If a conflict exists between any two documents, **stop and report the conflict** before implementing. Do not silently resolve it in favor of either side.
 
 ---
 
-## 2. Day-one product identity
+## 2. Product identities and track boundary
 
-Financial OS is a **private, single-owner, installable iPhone PWA** that captures receipt photos and produces durable structured financial data. The backend is a **portable modular monolith** on managed GCP.
+### 2.1 Operating receipt product
+
+The existing Financial OS receipt service is a **private, single-owner,
+installable iPhone PWA** that captures receipt photos and produces durable
+structured financial data. Its backend remains a **portable modular monolith**
+on managed GCP.
 
 The smallest complete day-one vertical slice:
 
 > Install PWA → authenticate → photograph receipt → upload → receive durable acknowledgement → retrieve structured data or explicit failure state.
 
 Nothing outside this flow is authorized for Wave 1 implementation.
+
+### 2.2 Premium mobile product
+
+The premium-mobile track is a separate private, single-owner Angular/Capacitor
+application. It may use Supabase for new application domains and Plaid for bank
+transactions only through an owner-approved premium-mobile execution packet. Its
+first product experience is awareness and reflection, not pre-purchase guidance.
+The operating receipt product continues unchanged and remains authoritative for
+receipt evidence.
 
 ---
 
@@ -83,7 +104,12 @@ Every agent must, in order:
 
 ## 5. What agents must never do
 
-- Expand beyond the current owner-approved execution packet. Unless that packet explicitly authorizes an item, do not add Plaid, Actual Budget, bank connectors, Amazon/email ingestion, correction UI, transaction matching, analytics, SwiftUI, Android, multi-user, rental itemization, event streaming, Kubernetes, or Redis.
+- Expand beyond the current owner-approved execution packet. For the receipt
+  track, do not add Plaid, Actual Budget, bank connectors, Amazon/email ingestion,
+  transaction matching, analytics, SwiftUI, Android, multi-user, rental
+  itemization, event streaming, Kubernetes, or Redis. A premium-mobile packet may
+  authorize only the named new-app capabilities within its isolated file and
+  service boundaries.
 - Emit real GCP project IDs, Firebase project identifiers, service-account email addresses, or real production resource names in any file, log, screenshot, or CI artifact intended for the public repository.
 - Commit secrets, credentials, signed URLs, auth tokens, or database passwords to source control.
 - Commit real receipt images, extracted financial content from real receipts, owner personal data (email, address, SSN, card numbers), or raw model output from private evidence.

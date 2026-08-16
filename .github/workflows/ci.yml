@@ -175,6 +175,41 @@ jobs:
       - name: Run Vitest
         run: pnpm test -- --reporter=verbose
 
+  # ── Premium mobile PM-0A: credential-free shell proof ────────────────────
+  mobile-proof:
+    name: Premium mobile proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.19.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint premium mobile
+        run: pnpm mobile:lint
+
+      - name: Type-check premium mobile
+        run: pnpm mobile:type-check
+
+      - name: Test premium mobile
+        run: pnpm mobile:test
+
+      - name: Build premium mobile
+        run: pnpm mobile:build
+
+      - name: Test premium Edge authorization boundary
+        run: pnpm premium:functions:test
+
   # ── Security: dependency scan + secret detection ──────────────────────────
   dependency-scan:
     name: Dependency vulnerability scan
@@ -299,6 +334,7 @@ jobs:
       - backend-contract
       - frontend-lint
       - frontend-test
+      - mobile-proof
       - dependency-scan
       - secret-scan
       - terraform-validate

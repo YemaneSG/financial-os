@@ -6,9 +6,15 @@
 
 ## What this project is
 
-A private, single-owner installable iPhone PWA that captures receipt photos and produces durable structured financial data. The backend is a portable modular monolith on managed GCP.
+This repository now contains two explicitly separated product tracks:
 
-Day-one outcome: install → authenticate → photograph → upload → durable acknowledgement → structured data or explicit failure state.
+1. the operating private receipt PWA and managed-GCP backend, which remain
+   unchanged and authoritative for receipt evidence; and
+2. a new private Angular/Capacitor premium-mobile application, which may use
+   Supabase and Plaid only through its current owner-approved execution packet.
+
+The premium application does not replace, migrate, dual-write, or silently change
+the receipt product.
 
 ---
 
@@ -16,16 +22,16 @@ Day-one outcome: install → authenticate → photograph → upload → durable 
 
 | Priority | Document |
 |---|---|
-| 1 (security floor) | `docs/security/control-baseline.md` |
-| 2 (product) | `docs/product/PRD.md`, `docs/product/roadmap.md` |
-| 3 (architecture) | `docs/architecture/system-architecture.md`, `docs/architecture/data-architecture.md` |
+| 1 (security floor) | `docs/security/control-baseline.md`; premium track also reads `docs/security/premium-mobile-control-addendum.md` |
+| 2 (product) | `docs/product/PRD.md`, `docs/product/premium-mobile-app-PRD.md`, `docs/product/roadmap.md`, `docs/product/open-items-and-decisions.md` |
+| 3 (architecture) | Receipt track: `docs/architecture/system-architecture.md`, `docs/architecture/data-architecture.md`; premium track: `docs/architecture/premium-mobile-system-architecture.md` |
 | 4 (implementation) | `docs/implementation/execution-packets/sprint-0-1-receipt-capture.md`, `docs/architecture/implementation-contracts.md` |
 | 5 (governance) | `docs/governance/ai-development-operating-model.md` |
 | Supporting context | `MAC_MINI_FINANCIAL_OS_BLUEPRINT.md`, `personal_ai_finance_codex_handoff.md` — superseded by tiers 1–5 |
 
 ---
 
-## Stack — non-negotiable
+## Receipt-track stack — non-negotiable within that track
 
 - **Frontend:** React 18 / TypeScript / Vite — PWA targeting iPhone Safari
 - **Backend:** FastAPI / Pydantic v2 / Python 3.12
@@ -72,6 +78,10 @@ Use `/session-start` to trigger this.
 ---
 
 For work after Wave 1, also read the current owner-approved packet in `docs/implementation/execution-packets/`. Its bounded scope supersedes Wave 1 exclusions only for the explicitly authorized capability.
+
+For premium-mobile work, the current premium-mobile packet controls the isolated
+`apps/mobile/` and `supabase/` boundaries. Do not apply the React/FastAPI receipt
+stack to that new application unless its packet explicitly calls for an adapter.
 
 ## Do not do these things
 

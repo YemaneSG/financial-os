@@ -1,0 +1,248 @@
+<div class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Financial OS</p>
+      <p class="today">Sunday, August 16</p>
+    </div>
+    <button class="profile-button" type="button" aria-label="Open profile">YO</button>
+  </header>
+
+  <main>
+    @if (currentView() === 'home') {
+      <section class="screen home-screen" aria-labelledby="home-heading">
+        <div class="screen-heading">
+          <p class="kicker">Your financial pulse</p>
+          <h1 id="home-heading">A calmer look at your money.</h1>
+        </div>
+
+        <article class="pulse-card">
+          <div class="pulse-topline">
+            <span>Spent this month</span>
+            <span class="synthetic-pill">Preview data</span>
+          </div>
+          <p class="pulse-amount">$1,284<span>.60</span></p>
+          <div class="pulse-comparison">
+            <span class="comparison-mark" aria-hidden="true">↘</span>
+            <span><strong>$142 less</strong> than this point last month</span>
+          </div>
+          <div class="spend-bar" aria-label="68 percent of the monthly reference amount">
+            <span></span>
+          </div>
+          <div class="pulse-footer">
+            <span>68% of monthly reference</span>
+            <span>15 days left</span>
+          </div>
+        </article>
+
+        <button class="reflection-callout" type="button" (click)="setView('reflect')">
+          <span class="reflection-icon" aria-hidden="true">✦</span>
+          <span class="reflection-copy">
+            <span class="callout-label">A moment to reflect</span>
+            <strong>3 purchases are ready</strong>
+            <span>About 45 seconds</span>
+          </span>
+          <span class="callout-arrow" aria-hidden="true">→</span>
+        </button>
+
+        <section class="section-block" aria-labelledby="recent-heading">
+          <div class="section-title-row">
+            <div>
+              <p class="section-kicker">Latest</p>
+              <h2 id="recent-heading">Recent activity</h2>
+            </div>
+            <button class="text-button" type="button" (click)="setView('activity')">See all</button>
+          </div>
+
+          <div class="activity-list compact-list">
+            @for (item of recentActivity; track item.id) {
+              <article class="activity-row">
+                <span class="merchant-mark" [attr.data-category]="item.category">{{ item.glyph }}</span>
+                <span class="activity-copy">
+                  <strong>{{ item.merchant }}</strong>
+                  <span>{{ item.detail }} · {{ item.date }}</span>
+                </span>
+                <span class="activity-value">
+                  <strong>{{ item.amount }}</strong>
+                  @if (item.receipt) {
+                    <span class="match-badge">Receipt</span>
+                  }
+                </span>
+              </article>
+            }
+          </div>
+        </section>
+      </section>
+    }
+
+    @if (currentView() === 'activity') {
+      <section class="screen activity-screen" aria-labelledby="activity-heading">
+        <div class="screen-heading split-heading">
+          <div>
+            <p class="kicker">Everything in one place</p>
+            <h1 id="activity-heading">Activity</h1>
+          </div>
+          <span class="sync-status"><i></i> Synced 2m ago</span>
+        </div>
+
+        <label class="search-box">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.4-4.4m2.4-5.1a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z"/></svg>
+          <span class="sr-only">Search activity</span>
+          <input type="search" placeholder="Search merchants or categories" (input)="setActivitySearch($event)" />
+        </label>
+
+        <div class="filter-row" aria-label="Filter activity">
+          <button type="button" [class.active]="activityFilter() === 'all'" (click)="setActivityFilter('all')">All</button>
+          <button type="button" [class.active]="activityFilter() === 'food'" (click)="setActivityFilter('food')">Food</button>
+          <button type="button" [class.active]="activityFilter() === 'shopping'" (click)="setActivityFilter('shopping')">Shopping</button>
+          <button type="button" [class.active]="activityFilter() === 'bills'" (click)="setActivityFilter('bills')">Bills</button>
+        </div>
+
+        <div class="activity-summary">
+          <span>August 12–16</span>
+          <strong>$316.98</strong>
+        </div>
+
+        <div class="activity-list full-list">
+          @for (item of filteredActivity(); track item.id) {
+            <article class="activity-row">
+              <span class="merchant-mark" [attr.data-category]="item.category">{{ item.glyph }}</span>
+              <span class="activity-copy">
+                <strong>{{ item.merchant }}</strong>
+                <span>
+                  {{ item.detail }} · {{ item.date }}
+                  @if (item.pending) { · Pending }
+                </span>
+              </span>
+              <span class="activity-value">
+                <strong>{{ item.amount }}</strong>
+                @if (item.receipt) {
+                  <span class="match-badge">Receipt</span>
+                }
+              </span>
+            </article>
+          } @empty {
+            <div class="empty-state">
+              <span aria-hidden="true">⌕</span>
+              <strong>No matching activity</strong>
+              <p>Try another search or filter.</p>
+            </div>
+          }
+        </div>
+
+        <p class="data-boundary">Synthetic preview only · No bank account is connected</p>
+      </section>
+    }
+
+    @if (currentView() === 'reflect') {
+      <section class="screen reflect-screen" aria-labelledby="reflect-heading">
+        <div class="reflect-topline">
+          <div>
+            <p class="kicker">Personal value, in your words</p>
+            <h1 id="reflect-heading">Reflect</h1>
+          </div>
+          <span>{{ reflectionIndex() }} of {{ reflectionTotal }}</span>
+        </div>
+
+        <div class="progress-track" aria-label="Reflection session progress">
+          <span [style.width.%]="reflectionProgress()"></span>
+        </div>
+
+        @if (currentReflection(); as item) {
+          <article
+            class="reflection-card"
+            [style.--card-accent]="item.accent"
+            (touchstart)="onTouchStart($event)"
+            (touchend)="onTouchEnd($event)"
+          >
+            <div class="receipt-ribbon">
+              <span class="receipt-glyph" aria-hidden="true">{{ item.merchant.slice(0, 1) }}</span>
+              <span>
+                <strong>{{ item.merchant }}</strong>
+                <span>{{ item.date }}</span>
+              </span>
+              <strong>{{ item.amount }}</strong>
+            </div>
+
+            <div class="reflection-subject">
+              <span class="subject-label">Purchase</span>
+              <h2>{{ item.item }}</h2>
+              <p>{{ item.context }}</p>
+            </div>
+
+            <div class="reflection-question">
+              <span class="question-mark" aria-hidden="true">?</span>
+              <h3>{{ item.question }}</h3>
+              <p>{{ item.prompt }}</p>
+            </div>
+
+            <div class="swipe-hint" aria-hidden="true">
+              <span>← {{ item.choices[0].shortLabel }}</span>
+              <span>{{ item.choices[2].shortLabel }} →</span>
+            </div>
+          </article>
+
+          <div class="choice-grid" aria-label="Reflection choices">
+            @for (choice of item.choices; track choice.id) {
+              <button
+                type="button"
+                [attr.data-tone]="choice.tone"
+                (click)="answerReflection(choice)"
+              >
+                <span aria-hidden="true">
+                  @if (choice.tone === 'negative') { − }
+                  @if (choice.tone === 'neutral') { ··· }
+                  @if (choice.tone === 'positive') { + }
+                </span>
+                {{ choice.label }}
+              </button>
+            }
+          </div>
+
+          <button class="skip-button" type="button" (click)="skipReflection()">Skip for now</button>
+          <p class="gesture-note">Swipe the card or use the labeled buttons. Every answer can be undone.</p>
+        } @else {
+          <article class="completion-card">
+            <span class="completion-mark" aria-hidden="true">✓</span>
+            <p class="kicker">Session complete</p>
+            <h2>That’s enough for today.</h2>
+            <p>You added {{ completedReflections() }} personal signals. Skips remain unlabeled.</p>
+            <button type="button" (click)="setView('home')">Back to your pulse</button>
+            <button class="secondary-action" type="button" (click)="restartReflection()">Review this preview again</button>
+          </article>
+        }
+
+        @if (toast()) {
+          <div class="toast" role="status">
+            <span>{{ toast() }}</span>
+            @if (reflectionHistory().length > 0) {
+              <button type="button" (click)="undoReflection()">Undo</button>
+            }
+          </div>
+        }
+      </section>
+    }
+
+    <div class="native-diagnostics" aria-live="polite">
+      @if (plaidReturnListener() === 'ready') { Native return listener ready. }
+      @if (plaidReturnListener() === 'failed') { Native return listener unavailable. }
+      @if (plaidReturn()) { Return received. Checking the bound server session before showing an outcome. }
+      @if (plaidReturnDisposition() === 'rejected') { Return rejected by local policy. }
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Primary navigation">
+    <button type="button" [class.active]="currentView() === 'home'" (click)="setView('home')">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5a1.5 1.5 0 0 1-1.5-1.5v-9Z"/></svg>
+      <span>Home</span>
+    </button>
+    <button type="button" [class.active]="currentView() === 'activity'" (click)="setView('activity')">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 19V9m5 10V5m6 14v-7m5 7V3"/></svg>
+      <span>Activity</span>
+    </button>
+    <button type="button" [class.active]="currentView() === 'reflect'" (click)="setView('reflect')">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 2m4-10v5h-5"/></svg>
+      <span>Reflect</span>
+      @if (reflectionIndex() < reflectionTotal) { <i>{{ reflectionTotal - reflectionIndex() }}</i> }
+    </button>
+  </nav>
+</div>
