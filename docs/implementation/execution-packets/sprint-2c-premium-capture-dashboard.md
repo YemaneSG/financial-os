@@ -1,10 +1,10 @@
 # Execution Packet — Sprint 2C Premium Capture and Receipt Dashboard
 
-**Status:** Implemented and locally verified; publication pending
+**Status:** Owner approved locally; production release authorized
 **Packet owner:** Yemane
 **Operating/integration lead:** Codex
 **Date:** August 16, 2026
-**Implementation base:** `origin/main` at `94ba2c4`
+**Implementation base:** `origin/main` at `a673b3e`
 **Working branch:** `codex/production-receipt-dashboard`
 
 ## Outcome
@@ -49,6 +49,23 @@ dashboard that makes receipt ingestion visible.
 The owner explicitly directed the operating lead to update the current production
 receipt capture and build its dashboard on August 16, 2026.
 
+On August 16, 2026, the owner reviewed the exact React capture surface locally
+with synthetic data, approved the premium layout and final copy, and explicitly
+authorized the guarded production release. This approval does not authorize any
+receipt-record rewrite, migration, deletion, or unrelated feature deployment.
+
+### Approved capture copy
+
+- Surface label: `Dollar Trail`
+- Kicker: `Every purchase leaves a clue`
+- Heading: `Follow the story behind every dollar.`
+- Support: `Snap the receipt now. Build a financial memory you can search,
+  review, and learn from.`
+
+`Dollar Trail` is the approved label for this receipt-capture surface. It does
+not execute the deferred repository, package, infrastructure, or full-product
+DollarTrace rename in `DT-OPEN-001`.
+
 ## Local verification
 
 | Gate | Result |
@@ -60,6 +77,8 @@ receipt capture and build its dashboard on August 16, 2026.
 | Private-data scan | Pass |
 | Phone-size synthetic visual review | Pass |
 
-No production deployment or private-data mutation was performed during local
-verification. Publication must pass the repository CI and guarded deployment
-workflow before this packet is marked complete.
+No private-data mutation was performed during local verification. Publication
+must pass the repository CI and guarded deployment workflow before this packet
+is marked complete. Production status is recorded on GitHub PR `#21` and its
+linked deployment run so this public packet does not embed private deployment
+identifiers.

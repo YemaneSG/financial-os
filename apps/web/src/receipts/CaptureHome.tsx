@@ -27,7 +27,7 @@ export function CaptureHome({ onImages }: CaptureHomeProps) {
     <main className="capture-home" aria-label="Capture receipt">
       <header className="premium-appbar">
         <div>
-          <p>Financial OS</p>
+          <p>Dollar Trail</p>
           <span>{today}</span>
         </div>
         <Link to="/receipts" className="premium-profile" aria-label="Open receipt history">
@@ -37,9 +37,9 @@ export function CaptureHome({ onImages }: CaptureHomeProps) {
 
       <div className="capture-home__content">
         <section className="capture-home__intro" aria-labelledby="capture-home-heading">
-          <p className="premium-kicker">Your financial memory</p>
-          <h1 id="capture-home-heading">Capture it. Trust that it’s there.</h1>
-          <p>Photograph the receipt now. Review and enrich it when you have time.</p>
+          <p className="premium-kicker">Every purchase leaves a clue</p>
+          <h1 id="capture-home-heading">Follow the story behind every dollar.</h1>
+          <p>Snap the receipt now. Build a financial memory you can search, review, and learn from.</p>
         </section>
 
         <section className="premium-capture-card" aria-label="New receipt">

@@ -4,7 +4,7 @@
 **Owner:** Yemane  
 **Maintainer:** Codex operating lead  
 **Created:** August 13, 2026  
-**Last updated:** August 15, 2026
+**Last updated:** August 16, 2026
 
 ## 1. How to use this register
 
@@ -19,6 +19,26 @@ Status values:
 - `Superseded` — replaced by a later recorded decision.
 
 ## 2. Accepted decisions
+
+### DT-DEC-005 — Premium receipt capture dashboard and surface label
+
+| Field | Decision |
+|---|---|
+| Status | `Accepted — owner approved locally; production release authorized` |
+| Decision date | August 16, 2026 |
+| Decision owner | Yemane |
+| Outcome | Preserve the proven production React PWA capture pipeline while giving the capture home a premium light/sage presentation and an owner-scoped ingestion dashboard. |
+| Dashboard contract | Show captured, processing, needs-review, failed, and recent receipt states using existing authenticated list/search APIs. Dashboard failure must never block capture. |
+| Approved surface label | **Dollar Trail** |
+| Approved copy | **Every purchase leaves a clue. Follow the story behind every dollar.** |
+| Naming boundary | `Dollar Trail` labels this receipt-capture surface only. The full DollarTrace repository/package/infrastructure rename in `DT-OPEN-001` remains deferred. |
+| Data boundary | No receipt record rewrite, migration, deletion, re-extraction, storage change, backend change, or contract change. |
+| Implementation contract | `docs/implementation/execution-packets/sprint-2c-premium-capture-dashboard.md` |
+| Release authority | Owner authorized the existing guarded CI and production deployment workflow after local review with synthetic data. |
+
+This decision does not replace `DT-DEC-001`. It distinguishes the approved
+receipt-capture surface label from the broader deferred DollarTrace rename and
+keeps existing production infrastructure and financial history unchanged.
 
 ### DT-DEC-004 — Sprint 2C combines receipt integrity and discovery
 
