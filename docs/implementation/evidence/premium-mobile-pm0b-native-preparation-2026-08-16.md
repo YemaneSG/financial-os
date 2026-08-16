@@ -43,6 +43,11 @@ tests.
 | Diff/whitespace check | Pass |
 | Receipt isolation | Pass — no receipt client, API, domain, contract, migration, or infrastructure file changed |
 
+The first hosted Android compile reached Capacitor and failed before application
+compilation because the workflow selected JDK 17 while Capacitor Android requires
+source release 21. The workflow was corrected to JDK 21; no product or security
+contract changed. The first macOS 26/Xcode 26 unsigned simulator build passed.
+
 ## Remaining acceptance evidence
 
 1. Obtain green GitHub Android and macOS 26/Xcode 26 builds.

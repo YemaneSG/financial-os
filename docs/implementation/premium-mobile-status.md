@@ -82,7 +82,8 @@ real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
 
 ## In progress
 
-- GitHub Android and macOS 26 current-platform compile evidence
+- GitHub macOS 26/Xcode 26 compile passed; Android reached Gradle and exposed a
+  JDK 17/source-21 mismatch, now corrected to JDK 21 for rerun
 - Owner-controlled HTTPS Universal/App Link selection and provider association
 - Real-iPhone and Android-emulator Hosted Link return verification
 
