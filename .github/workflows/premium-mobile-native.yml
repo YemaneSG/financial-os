@@ -68,14 +68,15 @@ jobs:
         working-directory: apps/mobile/android
         run: |
           for attempt in 1 2 3; do
-            if ./gradlew assembleDebug --no-daemon; then
-              exit 0
+            if ./gradlew --version --no-daemon; then
+              break
             fi
             if [[ "${attempt}" == "3" ]]; then
               exit 1
             fi
             sleep $((attempt * 5))
           done
+          ./gradlew assembleDebug --no-daemon
 
       - name: Prepare credential-free Android emulator
         run: |
