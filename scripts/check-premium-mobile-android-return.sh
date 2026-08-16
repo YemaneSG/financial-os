@@ -82,6 +82,7 @@ clear_and_launch() {
 
 send_completion_return() {
   adb shell am start -W \
+    -n "${MAIN_ACTIVITY}" \
     -a android.intent.action.VIEW \
     -c android.intent.category.BROWSABLE \
     -d "${COMPLETION_URI}" >/dev/null
@@ -118,6 +119,7 @@ wait_for_text "${EXPECTED_RETURN_STATUS}" "cold-start callback"
 # Forgery: query material is rejected and never rendered.
 clear_and_launch
 adb shell am start -W \
+  -n "${MAIN_ACTIVITY}" \
   -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
   -d "${COMPLETION_URI}?unexpected=synthetic" >/dev/null
