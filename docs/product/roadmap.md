@@ -26,8 +26,8 @@ The roadmap is model-agnostic and outcome-oriented. Sprint numbers describe sequ
 
 ### Parallel product track — Premium mobile application
 
-**Status:** PM-0A server/browser proof complete; PM-0B deferred pending its
-native lane.
+**Status:** PM-0A server/browser proof complete; PM-0B native return blocked;
+owner-authorized synthetic PM-1A experience implemented in parallel.
 
 This track is independent of the receipt capability sequence below. The operating
 receipt collector continues capturing data and remains authoritative for receipts.
@@ -38,6 +38,7 @@ and consumes receipt evidence through a stable read-only API adapter.
 |---|---|---|
 | PM-0A — Hosted auth and browser/session proof | A dedicated synthetic Firebase subject is enforced through Supabase RLS/Edge Functions and a bound Plaid Hosted Link session completes server-side | Owner-approved architecture/security/packet and Sandbox authority |
 | PM-0B — Native build and return proof | Current iOS and Android builds complete safe Hosted Link return on the approved targets | Xcode 26, real iPhone, Android SDK/emulator, and callback privacy evidence |
+| PM-1A — Synthetic product experience | The owner can navigate Home, Activity, and Reflect and complete an accessible synthetic reflection session | Explicit owner timebox authorization; does not waive PM-0B or complete PM-1 |
 | PM-1 — Installable shell and activity | The owner installs the Angular/Capacitor app, connects Plaid Sandbox, and sees deterministic transaction activity and sync health | PM-0 evidence plus CI |
 | PM-2 — Receipt adapter | Existing receipt evidence appears read-only without copying private evidence into Supabase | Frozen receipt contract remains unchanged |
 | PM-3 — Deterministic matching | The owner confirms, rejects, or leaves match candidates unresolved without losing decisions on regeneration | Exact-money and provenance tests |

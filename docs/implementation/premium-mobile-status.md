@@ -3,16 +3,18 @@
 **Snapshot:** August 16, 2026
 **Owner:** Yemane
 **Operating lead:** Codex
-**Phase:** PM-0A complete; PM-0B owner-authorized and in progress
+**Phase:** PM-0A complete; PM-0B blocked; PM-1A synthetic experience implemented
 **Working branch:** `codex/premium-mobile-bootstrap`
 **Implementation base:** `origin/main` at `94ba2c4`
 **Operating receipt collector:** Unchanged and continuing independently
 
 ## Current outcome
 
-PM-0A is complete. PM-0B now has a locally verified, token-free native callback
-boundary and credential-free current-platform CI lanes. The remaining gate is a
-real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
+PM-0A is complete. PM-0B builds on current iOS and Android toolchains, but its
+latest Android emulator run received the callback and rejected it under the local
+return policy; real HTTPS association and real-iPhone evidence also remain open.
+The owner stopped the debugging loop and authorized PM-1A in parallel. The app now
+has a real synthetic Home, Activity, and Reflect product experience.
 
 ## Completed
 
@@ -82,12 +84,19 @@ real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
 - Corrected the Android runner to Java 21 and obtained green Android and macOS
   26/Xcode 26 builds in native run 31970837438; full CI run 31970837452 also
   passed its final gate
+- Owner stopped the PM-0B debugging loop and authorized bounded synthetic PM-1A
+  product work under a 45-minute timebox
+- Replaced the visible native-proof page with a premium mobile Home, searchable
+  Activity, and accessible three-card Reflect experience
+- Added touch swipe, labeled non-swipe choices, skip-as-missing-evidence,
+  completion, and immediate undo behavior
+- Verified all three screens at a 390 × 844 viewport; mobile lint, type checking,
+  19 tests, production build, credential scan, and private-data scan pass
 
 ## In progress
 
-- Credential-free Android emulator return matrix added for interruption/no-return,
-  resume, replay, cold start, rejected query material, process health, and leakage
-  checks; hosted result pending
+- PM-0B Android callback policy correction, intentionally paused after the latest
+  native run received the callback but rejected it under local policy
 - Owner-controlled HTTPS Universal/App Link selection and provider association
 - Real-iPhone and Android-emulator Hosted Link return verification
 
@@ -102,7 +111,7 @@ real verified HTTPS link plus real-iPhone and Android-emulator return evidence.
 | Plaid developer Sandbox credentials | Hosted Link proof | Complete; stored as encrypted backend secrets only |
 | Official dependency registry access | Angular/Capacitor/Supabase scaffold | Authorized |
 | Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | GitHub macOS 26/Xcode 26 compile passed; signed real-iPhone delivery still required |
-| Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | GitHub Android compile passed; emulator return matrix queued |
+| Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | GitHub Android compile and emulator boot passed; latest callback was rejected by local policy |
 | Owner-controlled HTTPS Universal/App Link | Institution OAuth return and native mode | Exact host and platform association still required; no placeholder committed |
 | Claude Google reauthentication | Preferred implementation lead/independent Claude review | Blocked by provider reauthentication; alternative Codex agents remain available |
 
@@ -111,10 +120,11 @@ receipt-system change is authorized in PM-0.
 
 ## Next three actions
 
-1. Obtain a green Android-emulator synthetic return matrix.
+1. Review and accept the PM-1A product experience on the open local preview.
 2. Configure one owner-controlled HTTPS host with Apple and Android association,
    register it with Plaid, and switch the Sandbox function to native mode.
-3. Run success, cancel, interruption, resume, and privacy checks on a real iPhone
+3. Correct the bounded callback policy and run success, cancel, interruption,
+   resume, and privacy checks on a real iPhone
    and Android emulator; do not call PM-0 complete before both pass.
 
 ## Active canonical artifacts

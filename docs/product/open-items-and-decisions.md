@@ -24,7 +24,7 @@ Status values:
 
 | Field | Decision |
 |---|---|
-| Status | `Accepted — PM-0A complete; PM-0B pending` |
+| Status | `Accepted — PM-0A complete; PM-0B blocked; synthetic PM-1A authorized in parallel` |
 | Decision date | August 15, 2026 |
 | Decision owner | Yemane |
 | Product boundary | Build a new private premium mobile application alongside the operating receipt collector. The receipt collector continues unchanged and remains authoritative for receipt evidence. |
@@ -35,7 +35,7 @@ Status values:
 | Initial experience | Awareness and reflection: activity, receipt evidence, deterministic match confirmation, and low-friction personal-value feedback. Pre-purchase guidance is not v1. |
 | Distribution | One private owner first; controlled friends-and-family access requires a later multi-user packet. |
 | Architecture candidate | `docs/architecture/premium-mobile-system-architecture.md`, derived from the Opus proposal and corrected through Gate A |
-| Current gate | Gate A technical review passed at revision 2. PM-0A server/browser authorization, Hosted Link success/cancel/expiry/replay, and synthetic cleanup completed on August 16, 2026. PM-0B remains deferred pending its native lane. |
+| Current gate | Gate A technical review passed at revision 2. PM-0A server/browser authorization, Hosted Link success/cancel/expiry/replay, and synthetic cleanup completed on August 16, 2026. The owner authorized a bounded synthetic PM-1A product-experience slice in parallel on August 16; PM-0B remains required and incomplete. |
 
 This decision resolves the apparent Wave 1 conflict without changing the prior
 receipt decision. Plaid and Android remain excluded from the receipt product and
