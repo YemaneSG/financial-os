@@ -78,6 +78,9 @@ jobs:
       - name: Prepare credential-free Android emulator
         run: |
           sudo chmod 666 /dev/kvm
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/pm0b-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >>"$GITHUB_ENV"
           sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
           avdmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager -print -quit)"
           if [[ ! -x "${sdkmanager_path}" || ! -x "${avdmanager_path}" ]]; then
@@ -92,6 +95,10 @@ jobs:
             --name pm0b-proof \
             --package "system-images;android-35;google_apis;x86_64" \
             --device pixel_6 >/dev/null
+          if ! "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fxq pm0b-proof; then
+            echo "The PM-0B Android virtual device was not indexed." >&2
+            exit 1
+          fi
           printf '%s\n' \
             "$ANDROID_HOME/platform-tools" \
             "$ANDROID_HOME/emulator" \
