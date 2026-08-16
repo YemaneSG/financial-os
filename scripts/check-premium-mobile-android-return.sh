@@ -10,10 +10,10 @@ readonly EXPECTED_RETURN_STATUS="Return received. Checking the bound server sess
 
 apk_path="${1:-}"
 evidence_dir="${RUNNER_TEMP:-/tmp}/financial-os-pm0b-android"
-ui_dump_device="/data/local/tmp/financial-os-pm0b-ui.xml"
-ui_dump_local="${evidence_dir}/ui.xml"
+ui_state_local="${evidence_dir}/webview-state.txt"
 logcat_local="${evidence_dir}/logcat.txt"
 storage_local="${evidence_dir}/app-storage.tar"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ -z "${apk_path}" || ! -f "${apk_path}" ]]; then
   echo "Usage: $0 /absolute/path/to/app-debug.apk" >&2
@@ -28,31 +28,40 @@ cleanup() {
 
 trap cleanup EXIT
 
-wait_for_text() {
-  local expected="$1"
-
+forward_webview_debug() {
   for _ in {1..30}; do
-    adb shell uiautomator dump "${ui_dump_device}" >/dev/null 2>&1 || true
-    adb pull "${ui_dump_device}" "${ui_dump_local}" >/dev/null 2>&1 || true
-    if [[ -f "${ui_dump_local}" ]] && grep -Fq "${expected}" "${ui_dump_local}"; then
-      return 0
+    local app_pid
+    app_pid="$(adb shell pidof "${APP_ID}" 2>/dev/null | tr -d '\r')"
+    app_pid="${app_pid%% *}"
+    if [[ -n "${app_pid}" ]]; then
+      adb forward --remove tcp:9222 >/dev/null 2>&1 || true
+      if adb forward \
+        tcp:9222 \
+        "localabstract:webview_devtools_remote_${app_pid}" >/dev/null; then
+        return
+      fi
     fi
     sleep 1
   done
 
-  echo "Expected privacy-safe UI state was not observed." >&2
+  echo "A debuggable app process was not available." >&2
   exit 1
+}
+
+wait_for_text() {
+  local expected="$1"
+
+  forward_webview_debug
+  node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+    present "${expected}" "${ui_state_local}"
 }
 
 assert_text_absent() {
   local unexpected="$1"
 
-  adb shell uiautomator dump "${ui_dump_device}" >/dev/null 2>&1
-  adb pull "${ui_dump_device}" "${ui_dump_local}" >/dev/null 2>&1
-  if grep -Fq "${unexpected}" "${ui_dump_local}"; then
-    echo "Unexpected UI state was observed." >&2
-    exit 1
-  fi
+  forward_webview_debug
+  node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+    absent "${unexpected}" "${ui_state_local}"
 }
 
 clear_and_launch() {
@@ -116,7 +125,7 @@ adb exec-out run-as "${APP_ID}" sh -c \
 
 if grep -aEiq \
   '(public_token|link_token|access_token|client_secret|authorization:[[:space:]]*bearer)' \
-  "${ui_dump_local}" "${logcat_local}" "${storage_local}"; then
+  "${ui_state_local}" "${logcat_local}" "${storage_local}"; then
   echo "Credential-shaped callback material reached emulator evidence." >&2
   exit 1
 fi
