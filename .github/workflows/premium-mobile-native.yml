@@ -64,19 +64,38 @@ jobs:
 
       - name: Compile Android application
         working-directory: apps/mobile/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug --no-daemon; then
+              exit 0
+            fi
+            if [[ "${attempt}" == "3" ]]; then
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
 
       - name: Prepare credential-free Android emulator
         run: |
           sudo chmod 666 /dev/kvm
-          sdkmanager --install \
+          sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          avdmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager -print -quit)"
+          if [[ ! -x "${sdkmanager_path}" || ! -x "${avdmanager_path}" ]]; then
+            echo "Android SDK command-line tools were not found." >&2
+            exit 1
+          fi
+          "${sdkmanager_path}" --install \
             "emulator" \
             "system-images;android-35;google_apis;x86_64" >/dev/null
-          echo no | avdmanager create avd \
+          echo no | "${avdmanager_path}" create avd \
             --force \
             --name pm0b-proof \
             --package "system-images;android-35;google_apis;x86_64" \
             --device pixel_6 >/dev/null
+          printf '%s\n' \
+            "$ANDROID_HOME/platform-tools" \
+            "$ANDROID_HOME/emulator" \
+            >>"$GITHUB_PATH"
 
       - name: Start Android emulator
         run: |
