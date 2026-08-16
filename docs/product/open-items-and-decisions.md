@@ -4,7 +4,7 @@
 **Owner:** Yemane
 **Maintainer:** Codex operating lead
 **Created:** August 13, 2026
-**Last updated:** August 15, 2026
+**Last updated:** August 16, 2026
 
 ## 1. How to use this register
 
@@ -24,7 +24,7 @@ Status values:
 
 | Field | Decision |
 |---|---|
-| Status | `Accepted — architecture/security approved and PM-0A authorized` |
+| Status | `Accepted — PM-0A complete; PM-0B pending` |
 | Decision date | August 15, 2026 |
 | Decision owner | Yemane |
 | Product boundary | Build a new private premium mobile application alongside the operating receipt collector. The receipt collector continues unchanged and remains authoritative for receipt evidence. |
@@ -35,7 +35,7 @@ Status values:
 | Initial experience | Awareness and reflection: activity, receipt evidence, deterministic match confirmation, and low-friction personal-value feedback. Pre-purchase guidance is not v1. |
 | Distribution | One private owner first; controlled friends-and-family access requires a later multi-user packet. |
 | Architecture candidate | `docs/architecture/premium-mobile-system-architecture.md`, derived from the Opus proposal and corrected through Gate A |
-| Current gate | Gate A technical review passed at revision 2. The owner approved the architecture, security addendum, PM-0A packet, and bounded synthetic Sandbox authority on August 15, 2026. PM-0A is executable; PM-0B remains deferred pending its native lane. |
+| Current gate | Gate A technical review passed at revision 2. PM-0A server/browser authorization, Hosted Link success/cancel/expiry/replay, and synthetic cleanup completed on August 16, 2026. PM-0B remains deferred pending its native lane. |
 
 This decision resolves the apparent Wave 1 conflict without changing the prior
 receipt decision. Plaid and Android remain excluded from the receipt product and

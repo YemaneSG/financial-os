@@ -82,6 +82,12 @@ verified `SESSION_FINISHED` webhook or `/link/token/get`. PM-0A uses polling so 
 does not need a production webhook. Forged, cross-subject, expired, duplicate,
 and replayed returns cannot attach or exchange an Item.
 
+PM-0A creates Hosted Link in browser mode (`hosted_link.is_mobile_app = false`).
+Plaid requires a registered HTTPS Universal/App Link in the top-level
+`redirect_uri` when native-mobile mode is enabled. PM-0B owns that domain,
+allowlist, device-return, and `is_mobile_app = true` proof; PM-0A does not use a
+placeholder or unowned redirect domain to claim native readiness.
+
 PM-0 stops before public-token exchange and creates no persistent Plaid Item
 access token. PM-1 introduces exchange, Vault storage, synchronization, webhook,
 and disconnect behavior under its own packet.

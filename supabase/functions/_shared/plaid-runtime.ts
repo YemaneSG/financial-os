@@ -7,10 +7,9 @@ import {
   type PlaidGateway,
   type PlaidLinkSession,
 } from './plaid-hosted-link.ts';
+import { buildHostedLinkCreatePayload } from './plaid-link-config.ts';
 
 const PLAID_BASE_URL = 'https://sandbox.plaid.com';
-const COMPLETION_REDIRECT_URI = 'financialos://plaid/complete';
-const HOSTED_LINK_LIFETIME_SECONDS = 900;
 
 function requiredEnvironment(name: string): string {
   const value = Deno.env.get(name);
@@ -25,10 +24,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 class SandboxPlaidGateway implements PlaidGateway {
-  constructor(
-    private readonly clientId: string,
-    private readonly secret: string,
-  ) {}
+  private readonly clientId: string;
+  private readonly secret: string;
+
+  constructor(clientId: string, secret: string) {
+    this.clientId = clientId;
+    this.secret = secret;
+  }
 
   private async post(path: string, body: unknown): Promise<unknown> {
     const response = await fetch(`${PLAID_BASE_URL}${path}`, {
@@ -49,18 +51,10 @@ class SandboxPlaidGateway implements PlaidGateway {
   }
 
   async createHostedLink(clientUserId: string) {
-    const payload = await this.post('/link/token/create', {
-      client_name: 'Financial OS',
-      country_codes: ['US'],
-      hosted_link: {
-        completion_redirect_uri: COMPLETION_REDIRECT_URI,
-        is_mobile_app: true,
-        url_lifetime_seconds: HOSTED_LINK_LIFETIME_SECONDS,
-      },
-      language: 'en',
-      products: ['transactions'],
-      user: { client_user_id: clientUserId },
-    });
+    const payload = await this.post(
+      '/link/token/create',
+      buildHostedLinkCreatePayload(clientUserId),
+    );
 
     if (
       !isRecord(payload) ||

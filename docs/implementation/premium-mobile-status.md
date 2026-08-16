@@ -1,18 +1,18 @@
 # Premium Mobile — Current Status
 
-**Snapshot:** August 15, 2026
+**Snapshot:** August 16, 2026
 **Owner:** Yemane
 **Operating lead:** Codex
-**Phase:** PM-0A implementation
+**Phase:** PM-0A complete; PM-0B device/toolchain gate pending
 **Working branch:** `codex/premium-mobile-bootstrap`
 **Implementation base:** `origin/main` at `94ba2c4`
 **Operating receipt collector:** Unchanged and continuing independently
 
 ## Current outcome
 
-Implement the smallest technical proof: Firebase owner authorization through
-Supabase plus Plaid Sandbox Hosted Link server/browser completion in an isolated
-Angular/Capacitor shell.
+PM-0A is complete: Firebase owner authorization through Supabase and Plaid
+Sandbox Hosted Link server/browser completion are proven in the isolated
+Angular/Capacitor track. PM-0B remains the native build and device-return gate.
 
 ## Completed
 
@@ -48,15 +48,27 @@ Angular/Capacitor shell.
   refreshed version 204, inactive owner 403, disabled provider 403, restored 204
 - Direct Data API/RLS returns exactly the one synthetic proof row; the temporary
   synthetic identity was deleted and its temporary sign-in provider disabled
-- Plaid Hosted Link local boundary passes 22 function tests and 34 database
+- Plaid Hosted Link local boundary passes 23 function tests and 34 database
   assertions; database lint and Edge runtime type checks pass
 - Hosted private session migration and 10-assertion smoke pass; create/status
   Edge Functions are deployed with anonymous POST denied and GET rejected
+- Plaid Sandbox credentials are stored only as encrypted Edge Function secrets;
+  after a private terminal diagnostic briefly rendered the initial Sandbox
+  secret, it was rotated, the replacement was verified and deployed, the old
+  secret was revoked, and terminal/browser credential state was cleared
+- Live owner authorization and Hosted Link creation pass with 204 and 201
+- Live Sandbox completion returns `succeeded` twice, explicit exit returns
+  `cancelled` twice, and controlled expiry returns `expired` twice; none of the
+  status responses contains a public token, link token, or access token
+- Synthetic cleanup completed: three session rows and one owner row removed,
+  two temporary Firebase users deleted, temporary Email/Password disabled,
+  temporary Identity Toolkit API enablement reversed, and the temporary
+  Firebase Authentication Admin role removed and verified absent
 
 ## In progress
 
-- Plaid Sandbox credentials (blocked on owner Plaid Dashboard login)
-- Live Sandbox Hosted Link create/complete/cancel/expiry/replay proof
+- PM-0A handback and GitHub evidence update
+- PM-0B modern iOS/Android toolchain and native return planning
 
 ## Blockers and permissions
 
@@ -65,8 +77,8 @@ Angular/Capacitor shell.
 | GitHub Project authorization | Maintain private board and issues | Complete |
 | Architecture/security/packet approval | Begin Slice 0 implementation | Complete |
 | Isolated development Supabase project authority | Hosted auth/RLS proof | Complete; isolated free project and hosted matrix verified |
-| Private Firebase configuration and minimum custom-claim authority | Third-party auth proof | Complete; synthetic subject deleted after proof |
-| Plaid developer Sandbox credentials | Hosted Link proof | Blocked on owner Plaid Dashboard login |
+| Private Firebase configuration and minimum custom-claim authority | Third-party auth proof | Complete; synthetic users deleted, temporary provider/API disabled, temporary admin role removed |
+| Plaid developer Sandbox credentials | Hosted Link proof | Complete; stored as encrypted backend secrets only |
 | Official dependency registry access | Angular/Capacitor/Supabase scaffold | Authorized |
 | Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | Current host cannot satisfy; does not block PM-0A |
 | Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | Not installed; does not block PM-0A |
@@ -77,11 +89,11 @@ receipt-system change is authorized in PM-0A.
 
 ## Next three actions
 
-1. Owner signs in to the Plaid Dashboard; add Sandbox credentials directly to
-   Edge Function project secrets without entering them in source or chat.
-2. Run the live Sandbox Hosted Link complete/cancel/expiry/replay matrix and
-   remove its synthetic session.
-3. Publish the PM-0A handback; keep PM-0B open for the modern iOS/Android lane.
+1. Publish the PM-0A handback and close its bounded GitHub issue.
+2. Keep PM-0B open for a modern iOS/Android toolchain, an owner-controlled HTTPS
+   Universal/App Link, and real-device return evidence.
+3. Select the next owner-approved implementation slice after the PM-0 handback;
+   do not treat PM-0A browser evidence as native readiness.
 
 ## Active canonical artifacts
 
@@ -97,6 +109,7 @@ receipt-system change is authorized in PM-0A.
 ## Last known-good definition
 
 For the receipt product, `origin/main` remains the production baseline. For the
-premium-mobile track, `5b2d8c1` is the first credential-free shell baseline.
-Slice 0 will establish its first complete known-good tag only after every PM-0A
-and PM-0B acceptance row passes.
+premium-mobile track, `5b2d8c1` remains the first credential-free shell
+baseline. PM-0A now has complete server/browser evidence; Slice 0 will establish
+its complete known-good tag only after the separate PM-0B native acceptance rows
+pass.

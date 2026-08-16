@@ -3,7 +3,7 @@
 **Status:** Approved sequencing baseline
 **Owner:** Yemane
 **Created:** August 12, 2026
-**Last updated:** August 15, 2026
+**Last updated:** August 16, 2026
 
 ## 1. Purpose
 
@@ -26,8 +26,8 @@ The roadmap is model-agnostic and outcome-oriented. Sprint numbers describe sequ
 
 ### Parallel product track — Premium mobile application
 
-**Status:** Architecture, security, and PM-0A approved; PM-0A in progress and
-PM-0B deferred pending its native lane.
+**Status:** PM-0A server/browser proof complete; PM-0B deferred pending its
+native lane.
 
 This track is independent of the receipt capability sequence below. The operating
 receipt collector continues capturing data and remains authoritative for receipts.

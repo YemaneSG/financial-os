@@ -10,6 +10,7 @@ import {
   type OwnerAuthorizationResult,
   type PlaidLinkSession,
 } from './plaid-hosted-link.ts';
+import { buildHostedLinkCreatePayload } from './plaid-link-config.ts';
 
 const ENDPOINT = 'https://synthetic.invalid/functions/v1/plaid-link';
 const OWNER = 'synthetic-owner';
@@ -117,6 +118,18 @@ function post(body?: unknown, authorization = true): Request {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+
+test('uses browser Hosted Link mode until PM-0B owns a registered app link', () => {
+  const payload = buildHostedLinkCreatePayload('synthetic-client');
+
+  assert.equal(payload.hosted_link.is_mobile_app, false);
+  assert.equal('redirect_uri' in payload, false);
+  assert.equal(
+    payload.hosted_link.completion_redirect_uri,
+    'financialos://plaid/complete',
+  );
+  assert.equal(payload.hosted_link.url_lifetime_seconds, 900);
+});
 
 test('rejects unsupported methods before authorization or server access', async () => {
   const { dependencies, observations } = harness();
