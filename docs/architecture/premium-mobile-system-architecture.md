@@ -52,6 +52,10 @@ Supabase-native Auth tokens fail the issuer/audience test even if their `sub`
 matches. Every client-readable RLS policy and every owner-triggered Edge Function
 uses the same predicate. An Edge Function first calls the predicate with the
 caller's token; only then may its server-only path use administrative access.
+The Edge gateway's legacy Supabase-secret JWT check stays disabled for these
+functions because it cannot validate Firebase third-party tokens. The unchanged
+caller bearer is instead verified by the registered Supabase Data API Firebase
+integration before the shared predicate runs; any verification error fails closed.
 
 PM-0 uses a dedicated synthetic Firebase test subject in the registered project.
 That subject is never added to the receipt API allowlist. Firebase custom claims

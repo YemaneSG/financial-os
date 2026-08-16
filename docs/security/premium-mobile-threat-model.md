@@ -35,6 +35,7 @@ CI/hosted native builder -> signed build artifact -> test device
 | Stolen already-issued ID token | Immediate private active/version check on every request; provider refresh revocation plus device-loss runbook |
 | Custom-claim overwrite weakens another application | Dedicated synthetic subject; private read-modify-write/rollback record; never touch receipt allowlist |
 | Edge Function uses service role before owner authorization | First call the common active-owner predicate with caller JWT; administrative client is inaccessible before success |
+| Legacy Edge gateway rejects Firebase tokens or bypass is mistaken for trust | Disable only the incompatible legacy-secret check; pass the unchanged bearer to the registered Data API verifier and common predicate; fail closed on any verifier error |
 | Forged or replayed mobile callback | Callback is UI-only; short-lived server session bound to subject; server checks exact Link session; single-use/expiry/cross-subject tests |
 | Link or public token leaks through URI/log | No token in callback; redact URLs/query strings; device console, crash, cache, screenshot, bundle, and CI scans |
 | Plaid secret reaches client | Edge Function project secret only; bundle and source scan; client cannot enumerate secrets |

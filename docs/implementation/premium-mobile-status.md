@@ -40,12 +40,23 @@ Angular/Capacitor shell.
 - Mobile scaffold committed at `5b2d8c1`; credential-free GitHub CI run #48 passed
 - Local Supabase owner predicate, restrictive RLS proof, and caller-scoped Edge
   Function boundary implemented; 26 database assertions and 6 boundary tests pass
+- Isolated free hosted Supabase project created in the approved Ohio region;
+  Firebase third-party trust, migration, owner relationship, and Edge Function deployed
+- Hosted database matrix passes all 26 assertions; anonymous function access is
+  fail-closed and unsupported methods are rejected
+- Firebase-signed hosted lifecycle passes: valid owner 204, stale version 403,
+  refreshed version 204, inactive owner 403, disabled provider 403, restored 204
+- Direct Data API/RLS returns exactly the one synthetic proof row; the temporary
+  synthetic identity was deleted and its temporary sign-in provider disabled
+- Plaid Hosted Link local boundary passes 22 function tests and 34 database
+  assertions; database lint and Edge runtime type checks pass
+- Hosted private session migration and 10-assertion smoke pass; create/status
+  Edge Functions are deployed with anonymous POST denied and GET rejected
 
 ## In progress
 
-- Hosted Firebase/Supabase signature, Data API, and Edge Function authorization matrix
-- Selection/provisioning of the private PM-0A Supabase/Firebase/Plaid Sandbox resources
-- Plaid Sandbox Hosted Link subject/session proof
+- Plaid Sandbox credentials (blocked on owner Plaid Dashboard login)
+- Live Sandbox Hosted Link create/complete/cancel/expiry/replay proof
 
 ## Blockers and permissions
 
@@ -53,22 +64,24 @@ Angular/Capacitor shell.
 |---|---|---|
 | GitHub Project authorization | Maintain private board and issues | Complete |
 | Architecture/security/packet approval | Begin Slice 0 implementation | Complete |
-| Isolated development Supabase project authority | Hosted auth/RLS proof | Authorized; credentials/session still required |
-| Private Firebase configuration and minimum custom-claim authority | Third-party auth proof | Authorized; credentials/session still required |
-| Plaid developer Sandbox credentials | Hosted Link proof | Not present in current environment |
+| Isolated development Supabase project authority | Hosted auth/RLS proof | Complete; isolated free project and hosted matrix verified |
+| Private Firebase configuration and minimum custom-claim authority | Third-party auth proof | Complete; synthetic subject deleted after proof |
+| Plaid developer Sandbox credentials | Hosted Link proof | Blocked on owner Plaid Dashboard login |
 | Official dependency registry access | Angular/Capacitor/Supabase scaffold | Authorized |
 | Modern Xcode 26 host/runner and real iPhone | PM-0B native build/return evidence | Current host cannot satisfy; does not block PM-0A |
 | Android SDK/emulator or hosted runner | PM-0B Android build/return evidence | Not installed; does not block PM-0A |
 | Claude Google reauthentication | Preferred implementation lead/independent Claude review | Blocked by provider reauthentication; alternative Codex agents remain available |
 
-No live Plaid, production Supabase, real bank connection, native toolchain, or
-receipt-system change is required to start PM-0A.
+No Plaid Trial/live access, real bank connection, production deployment, or
+receipt-system change is authorized in PM-0A.
 
 ## Next three actions
 
-1. Record the PM-0A development resource choices privately and establish private sessions.
-2. Run the hosted Firebase/Supabase authorization matrix and roll back synthetic claims.
-3. Implement and prove the bounded Plaid Hosted Link server/browser session.
+1. Owner signs in to the Plaid Dashboard; add Sandbox credentials directly to
+   Edge Function project secrets without entering them in source or chat.
+2. Run the live Sandbox Hosted Link complete/cancel/expiry/replay matrix and
+   remove its synthetic session.
+3. Publish the PM-0A handback; keep PM-0B open for the modern iOS/Android lane.
 
 ## Active canonical artifacts
 

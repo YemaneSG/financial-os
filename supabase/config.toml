@@ -387,9 +387,28 @@ deno_version = 2
 
 [functions.pm0-auth-probe]
 enabled = true
-verify_jwt = true
+# Firebase third-party JWTs are not signed by Supabase's legacy JWT secret.
+# The function fails closed by forwarding the unchanged bearer token to the
+# registered Data API integration and then evaluating the common owner RPC.
+verify_jwt = false
 import_map = "./functions/deno.json"
 entrypoint = "./functions/pm0-auth-probe/index.ts"
+
+[functions.plaid-link-create]
+enabled = true
+# The unchanged Firebase bearer is verified by the registered Data API provider
+# and common owner predicate before any service-role or Plaid client is created.
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/plaid-link-create/index.ts"
+
+[functions.plaid-link-status]
+enabled = true
+# Match plaid-link-create: legacy Supabase-secret verification is incompatible
+# with registered Firebase third-party JWTs.
+verify_jwt = false
+import_map = "./functions/deno.json"
+entrypoint = "./functions/plaid-link-status/index.ts"
 
 [analytics]
 enabled = false
