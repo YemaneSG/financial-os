@@ -2,7 +2,11 @@ import { writeFileSync } from 'node:fs';
 
 const [mode, expectedText, outputPath] = process.argv.slice(2);
 
-if (!['present', 'absent'].includes(mode) || !expectedText || !outputPath) {
+if (
+  !['present', 'absent', 'arm-app-url-event', 'app-url-event-seen'].includes(mode) ||
+  !expectedText ||
+  !outputPath
+) {
   console.error('A WebView assertion mode, expected text, and output path are required.');
   process.exit(2);
 }
@@ -10,7 +14,7 @@ if (!['present', 'absent'].includes(mode) || !expectedText || !outputPath) {
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function evaluateBodyText(webSocketUrl) {
+async function evaluateExpression(webSocketUrl, expression) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(webSocketUrl);
     const timeout = setTimeout(() => {
@@ -24,7 +28,8 @@ async function evaluateBodyText(webSocketUrl) {
           id: 1,
           method: 'Runtime.evaluate',
           params: {
-            expression: 'document.body?.innerText ?? ""',
+            expression,
+            awaitPromise: true,
             returnByValue: true,
           },
         }),
@@ -50,7 +55,7 @@ async function evaluateBodyText(webSocketUrl) {
         return;
       }
 
-      resolve(String(response.result?.result?.value ?? ''));
+      resolve(response.result?.result?.value);
     });
 
     socket.addEventListener('error', () => {
@@ -60,7 +65,7 @@ async function evaluateBodyText(webSocketUrl) {
   });
 }
 
-async function readBodyText() {
+async function readExpression(expression) {
   const response = await fetch('http://127.0.0.1:9222/json', {
     signal: AbortSignal.timeout(2_000),
   });
@@ -77,17 +82,56 @@ async function readBodyText() {
     throw new Error('No debuggable WebView target was found.');
   }
 
-  return evaluateBodyText(target.webSocketDebuggerUrl);
+  return evaluateExpression(target.webSocketDebuggerUrl, expression);
 }
 
-const timeoutMilliseconds = mode === 'present' ? 30_000 : 5_000;
+const bodyTextExpression = 'document.body?.innerText ?? ""';
+const appUrlEventFlag = '__financialOsPm0bSawAppUrlOpen';
+const armAppUrlEventExpression = `
+  (async () => {
+    globalThis.${appUrlEventFlag} = false;
+    globalThis.__financialOsPm0bAppUrlHandle = await globalThis.Capacitor.Plugins.App.addListener(
+      'appUrlOpen',
+      () => { globalThis.${appUrlEventFlag} = true; },
+    );
+    return true;
+  })()
+`;
+
+if (mode === 'arm-app-url-event') {
+  try {
+    const armed = await readExpression(armAppUrlEventExpression);
+    if (armed === true) {
+      writeFileSync(outputPath, 'app-url-event-armed', { encoding: 'utf8', mode: 0o600 });
+      process.exit(0);
+    }
+  } catch {
+    // Fall through to the privacy-safe diagnostic below.
+  }
+  console.error('The direct App URL event observer could not be armed.');
+  process.exit(1);
+}
+
+const timeoutMilliseconds =
+  mode === 'absent' ? 5_000 : 30_000;
 const deadline = Date.now() + timeoutMilliseconds;
 let observedDom = false;
 let lastFailure = 'The WebView debug endpoint was not reachable.';
 
 while (Date.now() < deadline) {
   try {
-    const bodyText = await readBodyText();
+    if (mode === 'app-url-event-seen') {
+      const eventSeen = await readExpression(`Boolean(globalThis.${appUrlEventFlag})`);
+      if (eventSeen === true) {
+        writeFileSync(outputPath, 'app-url-event-seen', { encoding: 'utf8', mode: 0o600 });
+        process.exit(0);
+      }
+      lastFailure = 'The native App URL event was not observed.';
+      await delay(500);
+      continue;
+    }
+
+    const bodyText = String(await readExpression(bodyTextExpression));
     observedDom = true;
     writeFileSync(outputPath, bodyText, { encoding: 'utf8', mode: 0o600 });
 

@@ -72,6 +72,21 @@ assert_text_absent() {
   fi
 }
 
+arm_direct_app_url_event() {
+  forward_webview_debug
+  node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+    arm-app-url-event synthetic "${ui_state_local}"
+}
+
+assert_direct_app_url_event_seen() {
+  forward_webview_debug
+  if ! node "${script_dir}/check-premium-mobile-webview-state.mjs" \
+    app-url-event-seen synthetic "${ui_state_local}"; then
+    echo "Capacitor App URL event was not delivered during warm callback resume." >&2
+    exit 1
+  fi
+}
+
 clear_and_launch() {
   adb shell am force-stop "${APP_ID}" >/dev/null
   adb shell pm clear "${APP_ID}" >/dev/null
@@ -83,6 +98,7 @@ clear_and_launch() {
 send_completion_return() {
   adb shell am start -W \
     -n "${MAIN_ACTIVITY}" \
+    -f 0x34000000 \
     -a android.intent.action.VIEW \
     -c android.intent.category.BROWSABLE \
     -d "${COMPLETION_URI}" >/dev/null
@@ -104,7 +120,9 @@ wait_for_text "${EXPECTED_TITLE}" "interruption resume"
 assert_text_absent "${EXPECTED_RETURN_STATUS}" "interruption resume"
 
 # Resume: an exact callback wakes the already-running app into a neutral state.
+arm_direct_app_url_event
 send_completion_return
+assert_direct_app_url_event_seen
 wait_for_text "${EXPECTED_RETURN_STATUS}" "warm callback resume"
 
 # Replay: repeating the same public, token-free callback remains only a wake-up.
@@ -120,6 +138,7 @@ wait_for_text "${EXPECTED_RETURN_STATUS}" "cold-start callback"
 clear_and_launch
 adb shell am start -W \
   -n "${MAIN_ACTIVITY}" \
+  -f 0x34000000 \
   -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
   -d "${COMPLETION_URI}?unexpected=synthetic" >/dev/null
